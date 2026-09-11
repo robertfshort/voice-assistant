@@ -20,11 +20,16 @@ def test_load_sample_campaign() -> None:
     assert campaign.manifest.id == "whispering-road"
     assert campaign.manifest.name == "The Whispering Road"
     assert campaign.manifest.default_npc == "elara-voss"
-    assert len(campaign.npcs) == 1
-    assert campaign.npcs[0].name == "Elara Voss"
-    assert campaign.npcs[0].voice.providers["gemini"].voice == "Aoede"
-    assert campaign.npcs[0].secrets[0].id == "missing-caravan"
-    assert "Captain Rell" in campaign.npcs[0].secrets[0].body
+    assert len(campaign.npcs) == 2
+    elara = campaign.npc("elara-voss")
+    rell = campaign.npc("captain-rell")
+    assert elara.name == "Elara Voss"
+    assert elara.voice.providers["gemini"].voice == "Aoede"
+    assert elara.secrets[0].id == "missing-caravan"
+    assert "Captain Rell" in elara.secrets[0].body
+    assert rell.name == "Captain Tomas Rell"
+    assert rell.voice.providers["gemini"].voice == "Charon"
+    assert rell.secrets[0].id == "compromised-patrol"
     assert "lanterns-rest.md" in campaign.lore
     assert "opening.md" in campaign.scripts
 

@@ -1,0 +1,6 @@
+style: formal, controlled, quietly authoritative
+providers:
+  gemini:
+    voice: Charon
+  local-piper:
+    voice: en_US-ryan-medium

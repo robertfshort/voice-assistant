@@ -58,6 +58,10 @@ Initial fields:
 - Private knowledge
 - Secrets
 - Provider-specific voice mappings
+- Voice selectors populated from each configured provider's available voices
+- Mood, emotional tone, and speaking-style selectors with optional custom values
+- A voice preview using the selected voice and mood before saving
+- Portable provider-neutral voice and mood intent with provider-specific overrides
 - Portrait or token image
 
 Expected actions:

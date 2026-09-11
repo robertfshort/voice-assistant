@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import sys
 from pathlib import Path
 
 from PySide6.QtWidgets import QApplication
+from qasync import QEventLoop
 
 from voice_assistant.storage.settings import (
     AppSettings,
@@ -49,7 +51,12 @@ def main() -> int:
 
     window.campaign_root_changed.connect(save_campaign_root)
     window.show()
-    return application.exec()
+    event_loop = QEventLoop(application)
+    asyncio.set_event_loop(event_loop)
+    application.aboutToQuit.connect(event_loop.stop)
+    with event_loop:
+        event_loop.run_forever()
+    return 0
 
 
 if __name__ == "__main__":

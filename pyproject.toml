@@ -50,7 +50,7 @@ python_version = "3.12"
 strict = true
 
 [[tool.mypy.overrides]]
-module = ["PySide6.*", "yaml"]
+module = ["PySide6.*", "qasync", "yaml"]
 ignore_missing_imports = true
 
 [tool.bandit]

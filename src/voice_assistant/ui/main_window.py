@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+import asyncio
+import html
 from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
+    QCheckBox,
     QFileDialog,
     QFormLayout,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
     QLineEdit,
     QListWidget,
@@ -20,7 +24,10 @@ from PySide6.QtWidgets import (
 )
 
 from voice_assistant.domain.models import Campaign, Npc
+from voice_assistant.services.voice_session import VoiceSessionController
 from voice_assistant.storage.campaigns import discover_campaigns
+from voice_assistant.storage.credentials import CredentialStore
+from voice_assistant.storage.transcripts import append_transcript, load_transcript
 
 
 class MainWindow(QMainWindow):
@@ -32,6 +39,11 @@ class MainWindow(QMainWindow):
         self._campaigns: tuple[Campaign, ...] = ()
         self._active_campaign: Campaign | None = None
         self._active_npc: Npc | None = None
+        self._credentials = CredentialStore()
+        self._voice_session = VoiceSessionController()
+        self._voice_session.state_changed.connect(self._voice_state_changed)
+        self._voice_session.transcription.connect(self._receive_transcription)
+        self._voice_session.error.connect(self._voice_error)
         self.setWindowTitle("RPG Voice Assistant")
         self.resize(1100, 720)
         self._build_ui()
@@ -87,16 +99,25 @@ class MainWindow(QMainWindow):
         self._gm_input.returnPressed.connect(self._send_gm_text)
         input_form.addRow("Player says", self._player_input)
         input_form.addRow("GM directs", self._gm_input)
+        self._gm_request_response = QCheckBox("Request an NPC response")
+        self._gm_request_response.setToolTip(
+            "Unchecked: silently update NPC direction. Checked: ask the NPC to answer the GM."
+        )
+        input_form.addRow("GM mode", self._gm_request_response)
         workspace_layout.addLayout(input_form)
 
         controls = QHBoxLayout()
         self._start_button = QPushButton("Start voice session")
         self._start_button.setEnabled(False)
+        self._start_button.clicked.connect(self._toggle_voice_session)
+        provider_button = QPushButton("Gemini API key")
+        provider_button.clicked.connect(self._configure_gemini_key)
         player_button = QPushButton("Send player text")
         player_button.clicked.connect(self._send_player_text)
         gm_button = QPushButton("Send private GM instruction")
         gm_button.clicked.connect(self._send_gm_text)
         controls.addWidget(self._start_button)
+        controls.addWidget(provider_button)
         controls.addStretch()
         controls.addWidget(player_button)
         controls.addWidget(gm_button)
@@ -155,6 +176,10 @@ class MainWindow(QMainWindow):
         self._npc_list.setCurrentRow(default_index)
 
     def _select_npc(self, row: int) -> None:
+        if self._voice_session.active:
+            self._player_input.setEnabled(False)
+            self._gm_input.setEnabled(False)
+            asyncio.create_task(self._voice_session.stop())
         if self._active_campaign is None or not 0 <= row < len(self._active_campaign.npcs):
             self._active_npc = None
         else:
@@ -166,18 +191,116 @@ class MainWindow(QMainWindow):
             return
         self._npc_heading.setText(self._active_npc.name)
         self._profile.setMarkdown(self._active_npc.profile)
+        self._load_active_transcript()
         self._start_button.setEnabled(True)
+
+    def _load_active_transcript(self) -> None:
+        self._transcript.clear()
+        if self._active_campaign is None or self._active_npc is None:
+            return
+        for entry in load_transcript(self._active_campaign.directory, self._active_npc.id):
+            self._append_transcript_display(entry.speaker, entry.text, private=entry.private)
+
+    def _append_transcript_display(
+        self, speaker: str, text: str, *, private: bool = False
+    ) -> None:
+        label = (
+            "GM request (private)"
+            if speaker == "gm request"
+            else "GM instruction (private)"
+            if private
+            else speaker.capitalize()
+        )
+        value = f"<i>{html.escape(text)}</i>" if private else html.escape(text)
+        self._transcript.append(f"<b>{html.escape(label)}:</b> {value}")
+
+    def _save_transcript(self, speaker: str, text: str, *, private: bool = False) -> None:
+        if self._active_campaign is None or self._active_npc is None:
+            return
+        append_transcript(
+            self._active_campaign.directory,
+            self._active_npc.id,
+            speaker,
+            text,
+            private=private,
+        )
+        self._append_transcript_display(speaker, text, private=private)
 
     def _send_player_text(self) -> None:
         text = self._player_input.text().strip()
         if not text:
             return
-        self._transcript.append(f"<b>Player:</b> {text}")
+        self._save_transcript("player", text)
         self._player_input.clear()
+        if self._voice_session.active:
+            asyncio.create_task(self._voice_session.send_player_text(text))
 
     def _send_gm_text(self) -> None:
         text = self._gm_input.text().strip()
         if not text:
             return
-        self._transcript.append(f"<b>GM instruction (private):</b> <i>{text}</i>")
+        request_response = self._gm_request_response.isChecked()
+        speaker = "gm request" if request_response else "gm"
+        self._save_transcript(speaker, text, private=True)
         self._gm_input.clear()
+        if self._voice_session.active:
+            asyncio.create_task(
+                self._voice_session.send_gm_instruction(text, request_response=request_response)
+            )
+
+    def _configure_gemini_key(self) -> None:
+        key, accepted = QInputDialog.getText(
+            self,
+            "Gemini API key",
+            "API key (stored in the operating-system keyring)",
+            QLineEdit.EchoMode.Password,
+        )
+        if not accepted:
+            return
+        try:
+            self._credentials.set_gemini_api_key(key)
+        except ValueError as exc:
+            QMessageBox.critical(self, "Credential error", str(exc))
+            return
+        self.statusBar().showMessage("Gemini API key saved securely")
+
+    def _toggle_voice_session(self) -> None:
+        if self._voice_session.active:
+            asyncio.create_task(self._voice_session.stop())
+            return
+        if self._active_campaign is None or self._active_npc is None:
+            return
+        try:
+            api_key = self._credentials.get_gemini_api_key()
+        except ValueError as exc:
+            QMessageBox.critical(self, "Credential error", str(exc))
+            return
+        if not api_key:
+            QMessageBox.information(
+                self,
+                "Gemini API key required",
+                "Select Gemini API key and store a credential before starting a session.",
+            )
+            return
+        asyncio.create_task(
+            self._voice_session.start(self._active_campaign, self._active_npc, api_key)
+        )
+
+    def _voice_state_changed(self, state: str) -> None:
+        self._start_button.setText(
+            "Stop voice session" if state == "active" else "Start voice session"
+        )
+        controls_enabled = state != "connecting" and self._active_npc is not None
+        self._start_button.setEnabled(controls_enabled)
+        self._player_input.setEnabled(controls_enabled)
+        self._gm_input.setEnabled(controls_enabled)
+        self.statusBar().showMessage(f"Voice session: {state}")
+
+    def _receive_transcription(self, text: str, role: str, is_final: bool) -> None:
+        if not is_final or not text.strip():
+            return
+        speaker = "player" if role == "user" else "npc"
+        self._save_transcript(speaker, text)
+
+    def _voice_error(self, message: str) -> None:
+        QMessageBox.critical(self, "Voice session error", message)
