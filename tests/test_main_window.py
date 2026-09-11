@@ -36,6 +36,33 @@ def test_player_and_gm_inputs_are_visibly_distinct(qtbot: QtBot, tmp_path: Path)
     assert "GM instruction (private): Become more suspicious." in transcript
 
 
+def test_npc_knowledge_can_be_edited_and_appended_without_crossing_npcs(
+    qtbot: QtBot, tmp_path: Path
+) -> None:
+    campaign_root = tmp_path / "campaigns"
+    shutil.copytree(REPOSITORY_ROOT / "examples" / "campaigns", campaign_root)
+    window = MainWindow(campaign_root)
+    qtbot.addWidget(window)
+
+    assert window._knowledge_heading.text() == "Elara Voss"
+    assert "No sessions have been recorded." in window._knowledge_editor.toPlainText()
+    window._knowledge_editor.append("\nEdited knowledge.")
+    window._save_npc_knowledge()
+    window._knowledge_append.setPlainText("Appended knowledge.")
+    window._append_npc_knowledge()
+
+    elara_memory = (
+        campaign_root / "sample" / "characters" / "elara-voss" / "memory.md"
+    ).read_text(encoding="utf-8")
+    rell_memory = (
+        campaign_root / "sample" / "characters" / "captain-rell" / "memory.md"
+    ).read_text(encoding="utf-8")
+    assert "Edited knowledge." in elara_memory
+    assert "Appended knowledge." in elara_memory
+    assert "Edited knowledge." not in rell_memory
+    assert "Appended knowledge." not in rell_memory
+
+
 def test_lore_can_be_viewed_and_saved(qtbot: QtBot, tmp_path: Path) -> None:
     campaign_root = tmp_path / "campaigns"
     shutil.copytree(REPOSITORY_ROOT / "examples" / "campaigns", campaign_root)

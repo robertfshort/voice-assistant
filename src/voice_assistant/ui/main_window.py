@@ -29,6 +29,7 @@ from voice_assistant.services.voice_session import VoiceSessionController
 from voice_assistant.storage.campaigns import discover_campaigns
 from voice_assistant.storage.credentials import CredentialStore
 from voice_assistant.storage.lore import save_lore
+from voice_assistant.storage.npc_knowledge import append_npc_knowledge, save_npc_knowledge
 from voice_assistant.storage.transcripts import append_transcript, load_transcript
 
 
@@ -128,6 +129,33 @@ class MainWindow(QMainWindow):
         conversation_layout.addLayout(controls)
         tabs.addTab(conversation, "NPC conversation")
 
+        knowledge = QWidget()
+        knowledge_layout = QVBoxLayout(knowledge)
+        self._knowledge_heading = QLabel("No NPC selected")
+        self._knowledge_heading.setStyleSheet("font-size: 20px; font-weight: 600;")
+        knowledge_layout.addWidget(self._knowledge_heading)
+        knowledge_layout.addWidget(QLabel("NPC knowledge and persistent memory"))
+        self._knowledge_editor = QTextEdit()
+        self._knowledge_editor.setEnabled(False)
+        knowledge_layout.addWidget(self._knowledge_editor, 3)
+        knowledge_layout.addWidget(QLabel("Append knowledge without replacing existing text"))
+        self._knowledge_append = QTextEdit()
+        self._knowledge_append.setMaximumHeight(120)
+        self._knowledge_append.setEnabled(False)
+        knowledge_layout.addWidget(self._knowledge_append)
+        knowledge_controls = QHBoxLayout()
+        self._save_knowledge_button = QPushButton("Save edited knowledge")
+        self._save_knowledge_button.setEnabled(False)
+        self._save_knowledge_button.clicked.connect(self._save_npc_knowledge)
+        self._append_knowledge_button = QPushButton("Append knowledge")
+        self._append_knowledge_button.setEnabled(False)
+        self._append_knowledge_button.clicked.connect(self._append_npc_knowledge)
+        knowledge_controls.addStretch()
+        knowledge_controls.addWidget(self._save_knowledge_button)
+        knowledge_controls.addWidget(self._append_knowledge_button)
+        knowledge_layout.addLayout(knowledge_controls)
+        tabs.addTab(knowledge, "NPC knowledge")
+
         lore = QWidget()
         lore_layout = QVBoxLayout(lore)
         lore_layout.addWidget(QLabel("Campaign lore"))
@@ -168,7 +196,14 @@ class MainWindow(QMainWindow):
         self._save_lore_button.setEnabled(False)
         self._active_lore_id = None
         self._profile.clear()
+        self._knowledge_editor.clear()
+        self._knowledge_editor.setEnabled(False)
+        self._knowledge_append.clear()
+        self._knowledge_append.setEnabled(False)
+        self._save_knowledge_button.setEnabled(False)
+        self._append_knowledge_button.setEnabled(False)
         self._npc_heading.setText("No NPC selected")
+        self._knowledge_heading.setText("No NPC selected")
         for campaign in self._campaigns:
             self._campaign_list.addItem(campaign.manifest.name)
         if self._campaigns:
@@ -225,13 +260,77 @@ class MainWindow(QMainWindow):
             self._active_npc = self._active_campaign.npcs[row]
         if self._active_npc is None:
             self._npc_heading.setText("No NPC selected")
+            self._knowledge_heading.setText("No NPC selected")
             self._profile.clear()
+            self._knowledge_editor.clear()
+            self._knowledge_editor.setEnabled(False)
+            self._knowledge_append.clear()
+            self._knowledge_append.setEnabled(False)
+            self._save_knowledge_button.setEnabled(False)
+            self._append_knowledge_button.setEnabled(False)
             self._start_button.setEnabled(False)
             return
         self._npc_heading.setText(self._active_npc.name)
+        self._knowledge_heading.setText(self._active_npc.name)
         self._profile.setMarkdown(self._active_npc.profile)
+        self._knowledge_editor.setPlainText(self._active_npc.memory)
+        self._knowledge_editor.setEnabled(True)
+        self._knowledge_append.clear()
+        self._knowledge_append.setEnabled(True)
+        self._save_knowledge_button.setEnabled(True)
+        self._append_knowledge_button.setEnabled(True)
         self._load_active_transcript()
         self._start_button.setEnabled(True)
+
+    def _replace_active_npc_memory(self, memory: str) -> None:
+        if self._active_campaign is None or self._active_npc is None:
+            return
+        updated_npc = self._active_npc.model_copy(update={"memory": memory})
+        updated_npcs = tuple(
+            updated_npc if npc.id == updated_npc.id else npc for npc in self._active_campaign.npcs
+        )
+        updated_campaign = self._active_campaign.model_copy(update={"npcs": updated_npcs})
+        campaign_index = self._campaigns.index(self._active_campaign)
+        campaigns = list(self._campaigns)
+        campaigns[campaign_index] = updated_campaign
+        self._campaigns = tuple(campaigns)
+        self._active_campaign = updated_campaign
+        self._active_npc = updated_npc
+        self._knowledge_editor.setPlainText(memory)
+        if self._voice_session.active:
+            asyncio.create_task(self._voice_session.stop())
+            self.statusBar().showMessage(
+                "NPC knowledge saved; voice session stopped to reload context"
+            )
+        else:
+            self.statusBar().showMessage(f"Saved knowledge for {updated_npc.name}")
+
+    def _save_npc_knowledge(self) -> None:
+        if self._active_campaign is None or self._active_npc is None:
+            return
+        content = self._knowledge_editor.toPlainText()
+        try:
+            save_npc_knowledge(self._active_campaign.directory, self._active_npc.id, content)
+        except ValueError as exc:
+            QMessageBox.critical(self, "NPC knowledge save error", str(exc))
+            return
+        self._replace_active_npc_memory(content)
+
+    def _append_npc_knowledge(self) -> None:
+        if self._active_campaign is None or self._active_npc is None:
+            return
+        addition = self._knowledge_append.toPlainText().strip()
+        if not addition:
+            return
+        try:
+            updated = append_npc_knowledge(
+                self._active_campaign.directory, self._active_npc.id, addition
+            )
+        except ValueError as exc:
+            QMessageBox.critical(self, "NPC knowledge append error", str(exc))
+            return
+        self._knowledge_append.clear()
+        self._replace_active_npc_memory(updated)
 
     def _select_lore(self, row: int) -> None:
         if self._active_campaign is None:
