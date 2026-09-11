@@ -75,6 +75,66 @@ Expected actions:
 
 Deletion should be handled carefully once an NPC has transcripts, memories, or relationships. Archiving is safer than immediate destructive deletion.
 
+### Multi-NPC conversations
+
+A scene may include multiple voiced NPCs in the same conversation. This must not be implemented as one blended character prompt.
+
+Required capabilities:
+
+- Add and remove participating NPCs without changing the campaign roster
+- Preserve each NPC's distinct voice, mood, personality, memory, secrets, and knowledge boundaries
+- Route each response through the correct NPC identity and configured voice
+- Let the GM address one NPC, selected NPCs, or the whole scene
+- Support NPC-to-NPC dialogue without allowing an uncontrolled response loop
+- Record the active speaker on every transcript event
+- Maintain a shared scene transcript while updating only appropriate NPC memories
+- Show clearly which NPC is listening, speaking, muted, or privately directed
+- Prevent one NPC's restricted lore or private GM direction from leaking to another
+- Allow the GM to control turn order or approve suggested NPC interjections
+
+The initial implementation should favor explicit GM-controlled turns. Autonomous NPC-to-NPC exchanges require strict turn and chain-depth limits to prevent runaway conversations and provider costs.
+
+### Conversation curation and canon promotion
+
+The GM must be able to select useful player or NPC dialogue and promote it into persistent campaign lore. This handles improvised facts such as an NPC inventing a guildmaster's name, organization, location, event, or complete character during play.
+
+Expected workflow:
+
+1. Select one or more transcript entries or a text fragment.
+2. Choose **Add to lore**.
+3. Review and edit the proposed lore rather than saving it automatically.
+4. Choose an existing lore entry to append to or create a new entry.
+5. Assign title, type, visibility, distribution scopes, provenance, and related entities.
+6. Confirm the change as established campaign canon.
+7. Reload affected NPC context safely before later conversation turns.
+
+Promoted material should retain provenance linking it to the campaign, session, speaker, timestamp, and original transcript entry. If selected dialogue contains an invented NPC, the review screen should offer to create an NPC record and related lore together. AI-generated dialogue never becomes canon merely because an NPC said it; GM approval is required.
+
+### Pause, resume, and transcript correction
+
+The GM needs immediate control when table discussion goes out of character or a generated/player statement should not influence the campaign.
+
+Pause behavior:
+
+- Provide a prominent pause/resume control and configurable shortcut.
+- Stop microphone audio from reaching the provider while paused.
+- Stop or suppress NPC output promptly.
+- Display an unmistakable paused state.
+- Preserve the active scene and transcript so play can resume cleanly.
+- Do not transcribe, summarize, memorize, or derive lore from paused table discussion.
+
+Transcript correction behavior:
+
+- Let the GM strike a complete player/NPC turn or selected text within a turn.
+- Mark struck material as excluded from AI context, memory extraction, summaries, and lore proposals.
+- Visually retain struck material in the GM transcript by default so corrections remain understandable.
+- Never show struck material in player-facing exports unless explicitly requested.
+- Record who struck it and when, with undo support.
+- Offer deliberate permanent deletion separately for privacy-sensitive content.
+- If content was already sent to a realtime provider, clearly indicate that striking prevents future reuse but cannot erase the provider's current internal context; restart or rebuild the session context when strict removal is required.
+
+This requires transcript entries to have stable IDs and lifecycle states such as `active`, `struck`, and `promoted`, rather than treating the JSONL transcript as display-only text.
+
 ### Session transcription
 
 Play-session transcription should be a planned feature.

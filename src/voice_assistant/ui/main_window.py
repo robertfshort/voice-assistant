@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QSplitter,
+    QTabWidget,
     QTextEdit,
     QVBoxLayout,
     QWidget,
@@ -27,6 +28,7 @@ from voice_assistant.domain.models import Campaign, Npc
 from voice_assistant.services.voice_session import VoiceSessionController
 from voice_assistant.storage.campaigns import discover_campaigns
 from voice_assistant.storage.credentials import CredentialStore
+from voice_assistant.storage.lore import save_lore
 from voice_assistant.storage.transcripts import append_transcript, load_transcript
 
 
@@ -39,6 +41,7 @@ class MainWindow(QMainWindow):
         self._campaigns: tuple[Campaign, ...] = ()
         self._active_campaign: Campaign | None = None
         self._active_npc: Npc | None = None
+        self._active_lore_id: str | None = None
         self._credentials = CredentialStore()
         self._voice_session = VoiceSessionController()
         self._voice_session.state_changed.connect(self._voice_state_changed)
@@ -76,19 +79,20 @@ class MainWindow(QMainWindow):
         selection_layout.addWidget(self._npc_list)
         splitter.addWidget(selection)
 
-        workspace = QWidget()
-        workspace_layout = QVBoxLayout(workspace)
+        tabs = QTabWidget()
+        conversation = QWidget()
+        conversation_layout = QVBoxLayout(conversation)
         self._npc_heading = QLabel("No NPC selected")
         self._npc_heading.setStyleSheet("font-size: 20px; font-weight: 600;")
-        workspace_layout.addWidget(self._npc_heading)
+        conversation_layout.addWidget(self._npc_heading)
         self._profile = QTextEdit()
         self._profile.setReadOnly(True)
-        workspace_layout.addWidget(self._profile, 2)
+        conversation_layout.addWidget(self._profile, 2)
 
-        workspace_layout.addWidget(QLabel("Conversation"))
+        conversation_layout.addWidget(QLabel("Conversation"))
         self._transcript = QTextEdit()
         self._transcript.setReadOnly(True)
-        workspace_layout.addWidget(self._transcript, 2)
+        conversation_layout.addWidget(self._transcript, 2)
 
         input_form = QFormLayout()
         self._player_input = QLineEdit()
@@ -104,7 +108,7 @@ class MainWindow(QMainWindow):
             "Unchecked: silently update NPC direction. Checked: ask the NPC to answer the GM."
         )
         input_form.addRow("GM mode", self._gm_request_response)
-        workspace_layout.addLayout(input_form)
+        conversation_layout.addLayout(input_form)
 
         controls = QHBoxLayout()
         self._start_button = QPushButton("Start voice session")
@@ -121,8 +125,29 @@ class MainWindow(QMainWindow):
         controls.addStretch()
         controls.addWidget(player_button)
         controls.addWidget(gm_button)
-        workspace_layout.addLayout(controls)
-        splitter.addWidget(workspace)
+        conversation_layout.addLayout(controls)
+        tabs.addTab(conversation, "NPC conversation")
+
+        lore = QWidget()
+        lore_layout = QVBoxLayout(lore)
+        lore_layout.addWidget(QLabel("Campaign lore"))
+        self._lore_list = QListWidget()
+        self._lore_list.currentRowChanged.connect(self._select_lore)
+        lore_layout.addWidget(self._lore_list, 1)
+        self._lore_editor = QTextEdit()
+        self._lore_editor.setPlaceholderText("Select a lore file to view or edit it")
+        self._lore_editor.setEnabled(False)
+        lore_layout.addWidget(self._lore_editor, 3)
+        lore_controls = QHBoxLayout()
+        self._save_lore_button = QPushButton("Save lore")
+        self._save_lore_button.setEnabled(False)
+        self._save_lore_button.clicked.connect(self._save_lore)
+        lore_controls.addStretch()
+        lore_controls.addWidget(self._save_lore_button)
+        lore_layout.addLayout(lore_controls)
+        tabs.addTab(lore, "Lore")
+
+        splitter.addWidget(tabs)
         splitter.setStretchFactor(1, 1)
         layout.addWidget(splitter, 1)
         self.setCentralWidget(root)
@@ -137,6 +162,11 @@ class MainWindow(QMainWindow):
             self._campaigns = ()
         self._campaign_list.clear()
         self._npc_list.clear()
+        self._lore_list.clear()
+        self._lore_editor.clear()
+        self._lore_editor.setEnabled(False)
+        self._save_lore_button.setEnabled(False)
+        self._active_lore_id = None
         self._profile.clear()
         self._npc_heading.setText("No NPC selected")
         for campaign in self._campaigns:
@@ -159,11 +189,20 @@ class MainWindow(QMainWindow):
     def _select_campaign(self, row: int) -> None:
         self._active_campaign = self._campaigns[row] if 0 <= row < len(self._campaigns) else None
         self._active_npc = None
+        self._active_lore_id = None
         self._npc_list.clear()
+        self._lore_list.clear()
+        self._lore_editor.clear()
+        self._lore_editor.setEnabled(False)
+        self._save_lore_button.setEnabled(False)
         if self._active_campaign is None:
             return
         for npc in self._active_campaign.npcs:
             self._npc_list.addItem(npc.name)
+        for lore_id in sorted(self._active_campaign.lore):
+            self._lore_list.addItem(lore_id)
+        if self._lore_list.count():
+            self._lore_list.setCurrentRow(0)
         default_id = self._active_campaign.manifest.default_npc
         default_index = next(
             (
@@ -193,6 +232,44 @@ class MainWindow(QMainWindow):
         self._profile.setMarkdown(self._active_npc.profile)
         self._load_active_transcript()
         self._start_button.setEnabled(True)
+
+    def _select_lore(self, row: int) -> None:
+        if self._active_campaign is None:
+            self._active_lore_id = None
+        else:
+            lore_ids = sorted(self._active_campaign.lore)
+            self._active_lore_id = lore_ids[row] if 0 <= row < len(lore_ids) else None
+        if self._active_lore_id is None or self._active_campaign is None:
+            self._lore_editor.clear()
+            self._lore_editor.setEnabled(False)
+            self._save_lore_button.setEnabled(False)
+            return
+        self._lore_editor.setPlainText(self._active_campaign.lore[self._active_lore_id])
+        self._lore_editor.setEnabled(True)
+        self._save_lore_button.setEnabled(True)
+
+    def _save_lore(self) -> None:
+        if self._active_campaign is None or self._active_lore_id is None:
+            return
+        content = self._lore_editor.toPlainText()
+        try:
+            save_lore(self._active_campaign.directory, self._active_lore_id, content)
+        except ValueError as exc:
+            QMessageBox.critical(self, "Lore save error", str(exc))
+            return
+        updated_lore = dict(self._active_campaign.lore)
+        updated_lore[self._active_lore_id] = content
+        updated_campaign = self._active_campaign.model_copy(update={"lore": updated_lore})
+        campaign_index = self._campaigns.index(self._active_campaign)
+        campaigns = list(self._campaigns)
+        campaigns[campaign_index] = updated_campaign
+        self._campaigns = tuple(campaigns)
+        self._active_campaign = updated_campaign
+        if self._voice_session.active:
+            asyncio.create_task(self._voice_session.stop())
+            self.statusBar().showMessage("Lore saved; voice session stopped to reload context")
+        else:
+            self.statusBar().showMessage(f"Saved lore: {self._active_lore_id}")
 
     def _load_active_transcript(self) -> None:
         self._transcript.clear()

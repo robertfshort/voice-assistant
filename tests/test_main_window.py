@@ -36,6 +36,25 @@ def test_player_and_gm_inputs_are_visibly_distinct(qtbot: QtBot, tmp_path: Path)
     assert "GM instruction (private): Become more suspicious." in transcript
 
 
+def test_lore_can_be_viewed_and_saved(qtbot: QtBot, tmp_path: Path) -> None:
+    campaign_root = tmp_path / "campaigns"
+    shutil.copytree(REPOSITORY_ROOT / "examples" / "campaigns", campaign_root)
+    window = MainWindow(campaign_root)
+    qtbot.addWidget(window)
+
+    assert window._lore_list.count() == 1
+    assert window._lore_list.currentItem().text() == "lanterns-rest.md"
+    assert "Lantern's Rest" in window._lore_editor.toPlainText()
+
+    window._lore_editor.append("\nA newly established fact.")
+    window._save_lore()
+
+    saved = campaign_root / "sample" / "lore" / "lanterns-rest.md"
+    assert "A newly established fact." in saved.read_text(encoding="utf-8")
+    assert window._active_campaign is not None
+    assert "A newly established fact." in window._active_campaign.lore["lanterns-rest.md"]
+
+
 def test_switching_npcs_updates_profile_and_isolates_transcripts(
     qtbot: QtBot, tmp_path: Path
 ) -> None:
