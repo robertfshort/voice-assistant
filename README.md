@@ -2,6 +2,8 @@
 
 A portable, personal tabletop RPG voice assistant for prepared narration and conversational NPCs.
 
+See [ROADMAP.md](ROADMAP.md) for planned campaign editing, structured lore, session transcription, the GM generation assistant, and broader campaign-management possibilities.
+
 ## Project goals
 
 - Run locally as a desktop application.
