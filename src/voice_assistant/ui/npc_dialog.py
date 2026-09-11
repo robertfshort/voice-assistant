@@ -22,13 +22,18 @@ from voice_assistant.services.npc_generation import (
     expand_npc,
     generate_npc_field,
 )
+from voice_assistant.services.voice_preview import preview_voice
 from voice_assistant.storage.credentials import CredentialStore
 from voice_assistant.storage.npc_creation import NpcDraft
 
 
 class NpcDialog(QDialog):
     def __init__(
-        self, parent: QWidget | None = None, *, credentials: CredentialStore | None = None
+        self,
+        parent: QWidget | None = None,
+        *,
+        credentials: CredentialStore | None = None,
+        draft: NpcDraft | None = None,
     ) -> None:
         super().__init__(parent)
         self._credentials = credentials or CredentialStore()
@@ -86,9 +91,14 @@ class NpcDialog(QDialog):
         form.addRow("Gemini voice", self._field_with_ai(self.voice_input, "gemini_voice"))
         layout.addLayout(form)
 
+        action_row = QHBoxLayout()
         self.ai_expand_button = QPushButton("Generate this NPC with AI")
         self.ai_expand_button.clicked.connect(self._start_ai_expansion)
-        layout.addWidget(self.ai_expand_button)
+        action_row.addWidget(self.ai_expand_button)
+        self.voice_preview_button = QPushButton("Test voice settings")
+        self.voice_preview_button.clicked.connect(self._start_voice_preview)
+        action_row.addWidget(self.voice_preview_button)
+        layout.addLayout(action_row)
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Cancel | QDialogButtonBox.StandardButton.Save
@@ -96,6 +106,22 @@ class NpcDialog(QDialog):
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
+        if draft is not None:
+            self.setWindowTitle("Edit NPC")
+            self._apply_draft(draft)
+            self.id_input.setEnabled(False)
+
+    def _apply_draft(self, draft: NpcDraft) -> None:
+        self.name_input.setText(draft.name)
+        self.id_input.setText(draft.id)
+        self.role_input.setPlainText(draft.role)
+        self.personality_input.setPlainText(draft.personality)
+        self.background_input.setPlainText(draft.background)
+        self.goals_input.setPlainText(draft.goals)
+        self.public_knowledge_input.setPlainText(draft.public_knowledge)
+        self.mood_input.setCurrentText(draft.mood)
+        self.style_input.setCurrentText(draft.speaking_style)
+        self.voice_input.setCurrentText(draft.gemini_voice)
 
     def _field_with_ai(
         self, field_widget: QWidget, field: str, *, flesh_out: bool = False
@@ -129,6 +155,39 @@ class NpcDialog(QDialog):
             "speaking_style": self.style_input.currentText().strip(),
             "gemini_voice": self.voice_input.currentText(),
         }
+
+    def _start_voice_preview(self) -> None:
+        try:
+            api_key = self._credentials.get_gemini_api_key()
+        except ValueError as exc:
+            QMessageBox.critical(self, "Credential error", str(exc))
+            return
+        if not api_key:
+            QMessageBox.information(
+                self,
+                "Gemini API key required",
+                "Store a Gemini API key from the main window before testing a voice.",
+            )
+            return
+        self.voice_preview_button.setEnabled(False)
+        self.voice_preview_button.setText("Playing preview…")
+        asyncio.create_task(self._preview_voice(api_key))
+
+    async def _preview_voice(self, api_key: str) -> None:
+        name = self.name_input.text().strip() or "this character"
+        try:
+            await preview_voice(
+                api_key,
+                self.voice_input.currentText(),
+                self.mood_input.currentText().strip(),
+                self.style_input.currentText().strip(),
+                text=f"Greetings. I am {name}. This is how I will sound at the table.",
+            )
+        except Exception as exc:
+            QMessageBox.critical(self, "Voice preview error", str(exc))
+        finally:
+            self.voice_preview_button.setEnabled(True)
+            self.voice_preview_button.setText("Test voice settings")
 
     def _start_field_generation(self, field: str, button: QPushButton, *, flesh_out: bool) -> None:
         try:

@@ -3,7 +3,16 @@ from pathlib import Path
 import pytest
 
 from voice_assistant.domain.errors import CampaignError
-from voice_assistant.storage.lore import lore_path, save_lore
+from voice_assistant.storage.lore import create_lore, lore_path, save_lore
+
+
+def test_create_lore_writes_new_nested_entry_without_overwriting(tmp_path: Path) -> None:
+    result = create_lore(tmp_path, "places/crossroads.md", "# Crossroads\n\nNew lore.\n")
+
+    assert result == tmp_path / "lore" / "places" / "crossroads.md"
+    assert result.read_text(encoding="utf-8") == "# Crossroads\n\nNew lore.\n"
+    with pytest.raises(CampaignError, match="already exists"):
+        create_lore(tmp_path, "places/crossroads.md", "Replacement")
 
 
 def test_save_lore_replaces_existing_file_atomically(tmp_path: Path) -> None:

@@ -29,8 +29,8 @@ from voice_assistant.domain.models import Campaign, Npc
 from voice_assistant.services.voice_session import VoiceSessionController
 from voice_assistant.storage.campaigns import discover_campaigns, load_campaign
 from voice_assistant.storage.credentials import CredentialStore
-from voice_assistant.storage.lore import save_lore
-from voice_assistant.storage.npc_creation import create_npc
+from voice_assistant.storage.lore import create_lore, save_lore
+from voice_assistant.storage.npc_creation import create_npc, draft_from_npc, update_npc
 from voice_assistant.storage.npc_knowledge import append_npc_knowledge, save_npc_knowledge
 from voice_assistant.storage.transcripts import append_transcript, load_transcript
 from voice_assistant.ui.npc_dialog import NpcDialog
@@ -85,6 +85,10 @@ class MainWindow(QMainWindow):
         self._add_npc_button.setEnabled(False)
         self._add_npc_button.clicked.connect(self._create_npc)
         selection_layout.addWidget(self._add_npc_button)
+        self._edit_npc_button = QPushButton("Edit NPC")
+        self._edit_npc_button.setEnabled(False)
+        self._edit_npc_button.clicked.connect(self._edit_npc)
+        selection_layout.addWidget(self._edit_npc_button)
         splitter.addWidget(selection)
 
         tabs = QTabWidget()
@@ -174,10 +178,14 @@ class MainWindow(QMainWindow):
         self._lore_editor.setEnabled(False)
         lore_layout.addWidget(self._lore_editor, 3)
         lore_controls = QHBoxLayout()
+        self._new_lore_button = QPushButton("Create lore entry")
+        self._new_lore_button.setEnabled(False)
+        self._new_lore_button.clicked.connect(self._create_lore)
         self._save_lore_button = QPushButton("Save lore")
         self._save_lore_button.setEnabled(False)
         self._save_lore_button.clicked.connect(self._save_lore)
         lore_controls.addStretch()
+        lore_controls.addWidget(self._new_lore_button)
         lore_controls.addWidget(self._save_lore_button)
         lore_layout.addLayout(lore_controls)
         tabs.addTab(lore, "Lore")
@@ -201,6 +209,7 @@ class MainWindow(QMainWindow):
         self._lore_editor.clear()
         self._lore_editor.setEnabled(False)
         self._save_lore_button.setEnabled(False)
+        self._new_lore_button.setEnabled(False)
         self._active_lore_id = None
         self._profile.clear()
         self._knowledge_editor.clear()
@@ -211,6 +220,7 @@ class MainWindow(QMainWindow):
         self._append_knowledge_button.setEnabled(False)
         self._npc_heading.setText("No NPC selected")
         self._knowledge_heading.setText("No NPC selected")
+        self._edit_npc_button.setEnabled(False)
         for campaign in self._campaigns:
             self._campaign_list.addItem(campaign.manifest.name)
         if self._campaigns:
@@ -238,6 +248,7 @@ class MainWindow(QMainWindow):
         self._lore_editor.setEnabled(False)
         self._save_lore_button.setEnabled(False)
         self._add_npc_button.setEnabled(self._active_campaign is not None)
+        self._new_lore_button.setEnabled(self._active_campaign is not None)
         if self._active_campaign is None:
             return
         for npc in self._active_campaign.npcs:
@@ -281,6 +292,31 @@ class MainWindow(QMainWindow):
         self._npc_list.setCurrentRow(new_row)
         self.statusBar().showMessage(f"Created NPC: {draft.name}")
 
+    def _edit_npc(self) -> None:
+        if self._active_campaign is None or self._active_npc is None:
+            return
+        npc_id = self._active_npc.id
+        dialog = NpcDialog(
+            self, credentials=self._credentials, draft=draft_from_npc(self._active_npc)
+        )
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        try:
+            draft = dialog.draft()
+            update_npc(self._active_campaign.directory, draft)
+            updated_campaign = load_campaign(self._active_campaign.directory)
+        except ValueError as exc:
+            QMessageBox.critical(self, "NPC editing error", str(exc))
+            return
+        campaign_index = self._campaigns.index(self._active_campaign)
+        campaigns = list(self._campaigns)
+        campaigns[campaign_index] = updated_campaign
+        self._campaigns = tuple(campaigns)
+        self._select_campaign(campaign_index)
+        row = next(index for index, npc in enumerate(updated_campaign.npcs) if npc.id == npc_id)
+        self._npc_list.setCurrentRow(row)
+        self.statusBar().showMessage(f"Updated NPC: {draft.name}")
+
     def _select_npc(self, row: int) -> None:
         if self._voice_session.active:
             self._player_input.setEnabled(False)
@@ -290,6 +326,7 @@ class MainWindow(QMainWindow):
             self._active_npc = None
         else:
             self._active_npc = self._active_campaign.npcs[row]
+        self._edit_npc_button.setEnabled(self._active_npc is not None)
         if self._active_npc is None:
             self._npc_heading.setText("No NPC selected")
             self._knowledge_heading.setText("No NPC selected")
@@ -363,6 +400,46 @@ class MainWindow(QMainWindow):
             return
         self._knowledge_append.clear()
         self._replace_active_npc_memory(updated)
+
+    def _create_lore(self) -> None:
+        if self._active_campaign is None:
+            return
+        lore_id, accepted = QInputDialog.getText(
+            self,
+            "Create lore entry",
+            "File name relative to the lore folder (Markdown or text)",
+            text="new-lore.md",
+        )
+        lore_id = lore_id.strip().replace("\\", "/")
+        if not accepted or not lore_id:
+            return
+        title = Path(lore_id).stem.replace("-", " ").replace("_", " ").strip().title()
+        content = f"# {title}\n\n"
+        try:
+            create_lore(self._active_campaign.directory, lore_id, content)
+        except ValueError as exc:
+            QMessageBox.critical(self, "Lore creation error", str(exc))
+            return
+        updated_lore = dict(self._active_campaign.lore)
+        updated_lore[lore_id] = content
+        updated_campaign = self._active_campaign.model_copy(update={"lore": updated_lore})
+        campaign_index = self._campaigns.index(self._active_campaign)
+        campaigns = list(self._campaigns)
+        campaigns[campaign_index] = updated_campaign
+        self._campaigns = tuple(campaigns)
+        self._active_campaign = updated_campaign
+        self._lore_list.clear()
+        lore_ids = sorted(updated_lore)
+        self._lore_list.addItems(lore_ids)
+        self._lore_list.setCurrentRow(lore_ids.index(lore_id))
+        self._lore_editor.setFocus()
+        if self._voice_session.active:
+            asyncio.create_task(self._voice_session.stop())
+            self.statusBar().showMessage(
+                "Lore entry created; voice session stopped to reload context"
+            )
+        else:
+            self.statusBar().showMessage(f"Created lore: {lore_id}")
 
     def _select_lore(self, row: int) -> None:
         if self._active_campaign is None:

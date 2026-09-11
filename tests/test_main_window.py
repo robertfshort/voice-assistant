@@ -106,6 +106,27 @@ def test_npc_knowledge_can_be_edited_and_appended_without_crossing_npcs(
     assert "Appended knowledge." not in rell_memory
 
 
+def test_lore_entry_can_be_created_and_selected(
+    qtbot: QtBot, tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    campaign_root = tmp_path / "campaigns"
+    shutil.copytree(REPOSITORY_ROOT / "examples" / "campaigns", campaign_root)
+    monkeypatch.setattr(
+        main_window_module.QInputDialog,
+        "getText",
+        lambda *args, **kwargs: ("places/three-roads.md", True),
+    )
+    window = MainWindow(campaign_root)
+    qtbot.addWidget(window)
+
+    window._create_lore()
+
+    created = campaign_root / "sample" / "lore" / "places" / "three-roads.md"
+    assert created.read_text(encoding="utf-8") == "# Three Roads\n\n"
+    assert window._active_lore_id == "places/three-roads.md"
+    assert window._lore_editor.toPlainText() == "# Three Roads\n\n"
+
+
 def test_lore_can_be_viewed_and_saved(qtbot: QtBot, tmp_path: Path) -> None:
     campaign_root = tmp_path / "campaigns"
     shutil.copytree(REPOSITORY_ROOT / "examples" / "campaigns", campaign_root)

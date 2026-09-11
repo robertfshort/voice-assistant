@@ -16,3 +16,7 @@
 {"timestamp": "2026-09-11T17:55:58.486254Z", "speaker": "player", "text": "What is the name of the guild master of the Trade Nexus?", "private": false}
 {"timestamp": "2026-09-11T19:03:10.373988Z", "speaker": "player", "text": "what can you tell me about Captain Rell?", "private": false}
 {"timestamp": "2026-09-11T19:03:18.610417Z", "speaker": "npc", "text": "Good detective, for the city. Unfortunately. Makes getting things done difficult. Why do you ask?", "private": false}
+{"timestamp": "2026-09-11T19:55:00.057766Z", "speaker": "player", "text": "who are teh other notable people in Lantern's rest?", "private": false}
+{"timestamp": "2026-09-11T19:55:13.058013Z", "speaker": "npc", "text": "You'll see caravan leaders, merchants, sometimes guards on their break. Mostly passing through. Captain Rell is in charge of patrols outside the gate. Anyone specific you had in mind?", "private": false}
+{"timestamp": "2026-09-11T19:55:19.755135Z", "speaker": "player", "text": "Who is the mayor?", "private": false}
+{"timestamp": "2026-09-11T19:55:27.229600Z", "speaker": "npc", "text": "That'd be Mayor Thorne. Doesn't come around here much. Stays inside the city walls. Why ask?", "private": false}

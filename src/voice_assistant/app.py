@@ -30,10 +30,15 @@ def main() -> int:
     arguments = _parser().parse_args()
     settings = load_settings(arguments.config)
     storage = settings.storage
-    if arguments.campaign_root is not None or arguments.portable:
+    frozen_portable = (
+        getattr(sys, "frozen", False)
+        and arguments.campaign_root is None
+        and storage.campaign_root is None
+    )
+    if arguments.campaign_root is not None or arguments.portable or frozen_portable:
         storage = StorageSettings(
             campaign_root=arguments.campaign_root or storage.campaign_root,
-            portable_mode=arguments.portable or storage.portable_mode,
+            portable_mode=arguments.portable or frozen_portable or storage.portable_mode,
         )
     campaign_root = resolve_campaign_root(storage)
 

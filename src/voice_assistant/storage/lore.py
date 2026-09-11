@@ -23,6 +23,19 @@ def lore_path(campaign_directory: Path, lore_id: str) -> Path:
     return destination
 
 
+def create_lore(campaign_directory: Path, lore_id: str, content: str) -> Path:
+    destination = lore_path(campaign_directory, lore_id)
+    try:
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        with destination.open("x", encoding="utf-8", newline="\n") as file:
+            file.write(content)
+    except FileExistsError as exc:
+        raise CampaignError(f"Lore file already exists: {destination}") from exc
+    except OSError as exc:
+        raise CampaignError(f"Unable to create lore file {destination}: {exc}") from exc
+    return destination
+
+
 def save_lore(campaign_directory: Path, lore_id: str, content: str) -> Path:
     destination = lore_path(campaign_directory, lore_id)
     if not destination.exists():

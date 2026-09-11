@@ -72,6 +72,9 @@ Expected actions:
 - Archive NPC
 - Assign lore scopes and affiliations
 - Preview the configured voice
+- Add the NPC's relevant public facts to campaign lore when the NPC is saved
+
+Public lore created from an NPC should capture facts other characters may reasonably know, such as Elara being the tavernkeeper or Duggar being the mayor. The GM should be able to review the proposed lore, choose its scopes, and resolve duplicates or conflicts before it becomes established canon. Private knowledge, secrets, and GM-only details must never be included automatically.
 
 Deletion should be handled carefully once an NPC has transcripts, memories, or relationships. Archiving is safer than immediate destructive deletion.
 

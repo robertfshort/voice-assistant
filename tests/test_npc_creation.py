@@ -4,7 +4,7 @@ import pytest
 
 from voice_assistant.domain.errors import CampaignError
 from voice_assistant.storage.campaigns import load_campaign
-from voice_assistant.storage.npc_creation import NpcDraft, create_npc
+from voice_assistant.storage.npc_creation import NpcDraft, create_npc, draft_from_npc, update_npc
 
 
 def _campaign(root: Path) -> Path:
@@ -58,6 +58,40 @@ def test_create_npc_refuses_to_overwrite_existing_character(tmp_path: Path) -> N
 
     with pytest.raises(CampaignError, match="already exists"):
         create_npc(campaign_directory, _draft())
+
+
+def test_update_npc_changes_profile_and_voice_but_preserves_private_files(tmp_path: Path) -> None:
+    campaign_directory = _campaign(tmp_path)
+    create_npc(campaign_directory, _draft())
+    npc_directory = campaign_directory / "characters" / "guildmaster-vale"
+    (npc_directory / "memory.md").write_text("Private memory", encoding="utf-8")
+    (npc_directory / "secrets.md").write_text("# Preserved secrets\n", encoding="utf-8")
+    (npc_directory / "voice.yaml").write_text(
+        "style: old\nproviders:\n  gemini:\n    voice: Aoede\n  local:\n    voice: custom\n",
+        encoding="utf-8",
+    )
+    draft = _draft().model_copy(update={"name": "Mara Vale", "gemini_voice": "Kore"})
+
+    update_npc(campaign_directory, draft)
+    npc = load_campaign(campaign_directory).npc("guildmaster-vale")
+
+    assert npc.name == "Mara Vale"
+    assert npc.voice.providers["gemini"].voice == "Kore"
+    assert npc.voice.providers["local"].voice == "custom"
+    assert (npc_directory / "memory.md").read_text(encoding="utf-8") == "Private memory"
+    assert (npc_directory / "secrets.md").read_text(encoding="utf-8") == "# Preserved secrets\n"
+
+
+def test_draft_from_npc_reads_editable_profile_fields(tmp_path: Path) -> None:
+    campaign_directory = _campaign(tmp_path)
+    create_npc(campaign_directory, _draft())
+
+    draft = draft_from_npc(load_campaign(campaign_directory).npc("guildmaster-vale"))
+
+    assert draft.name == "Guildmaster Vale"
+    assert draft.role == "Leader of the merchants guild."
+    assert draft.background == "A former caravan factor."
+    assert draft.gemini_voice == "Charon"
 
 
 @pytest.mark.parametrize("npc_id", ("Guildmaster", "../vale", "vale smith", ""))
