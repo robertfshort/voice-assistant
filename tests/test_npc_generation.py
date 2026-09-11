@@ -8,6 +8,7 @@ def test_json_body_removes_markdown_fence() -> None:
 def test_npc_expansion_requires_all_review_fields() -> None:
     expansion = NpcExpansion.model_validate(
         {
+            "name": "Mara Vale",
             "role": "Guildmaster",
             "personality": "Patient",
             "background": "Former factor",
@@ -18,5 +19,6 @@ def test_npc_expansion_requires_all_review_fields() -> None:
         }
     )
 
+    assert expansion.name == "Mara Vale"
     assert expansion.goals == "Protect trade"
     assert expansion.public_knowledge == "Collects guild dues"

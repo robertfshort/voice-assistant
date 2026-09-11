@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QFormLayout,
+    QHBoxLayout,
     QLineEdit,
     QMessageBox,
     QPushButton,
@@ -16,7 +17,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from voice_assistant.services.npc_generation import NpcExpansion, expand_npc
+from voice_assistant.services.npc_generation import (
+    NpcExpansion,
+    expand_npc,
+    generate_npc_field,
+)
 from voice_assistant.storage.credentials import CredentialStore
 from voice_assistant.storage.npc_creation import NpcDraft
 
@@ -61,19 +66,27 @@ class NpcDialog(QDialog):
             ("Aoede", "Charon", "Fenrir", "Kore", "Leda", "Orus", "Puck", "Zephyr")
         )
 
-        form.addRow("Name", self.name_input)
+        form.addRow("Name", self._field_with_ai(self.name_input, "name"))
         form.addRow("Stable ID", self.id_input)
-        form.addRow("Role", self.role_input)
-        form.addRow("Personality", self.personality_input)
-        form.addRow("Background", self.background_input)
-        form.addRow("Goals", self.goals_input)
-        form.addRow("Public knowledge", self.public_knowledge_input)
-        form.addRow("Mood", self.mood_input)
-        form.addRow("Speaking style", self.style_input)
-        form.addRow("Gemini voice", self.voice_input)
+        form.addRow("Role", self._field_with_ai(self.role_input, "role", flesh_out=True))
+        form.addRow(
+            "Personality",
+            self._field_with_ai(self.personality_input, "personality", flesh_out=True),
+        )
+        form.addRow(
+            "Background", self._field_with_ai(self.background_input, "background", flesh_out=True)
+        )
+        form.addRow("Goals", self._field_with_ai(self.goals_input, "goals", flesh_out=True))
+        form.addRow(
+            "Public knowledge",
+            self._field_with_ai(self.public_knowledge_input, "public_knowledge", flesh_out=True),
+        )
+        form.addRow("Mood", self._field_with_ai(self.mood_input, "mood"))
+        form.addRow("Speaking style", self._field_with_ai(self.style_input, "speaking_style"))
+        form.addRow("Gemini voice", self._field_with_ai(self.voice_input, "gemini_voice"))
         layout.addLayout(form)
 
-        self.ai_expand_button = QPushButton("Generate or expand with AI")
+        self.ai_expand_button = QPushButton("Generate this NPC with AI")
         self.ai_expand_button.clicked.connect(self._start_ai_expansion)
         layout.addWidget(self.ai_expand_button)
 
@@ -83,6 +96,102 @@ class NpcDialog(QDialog):
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
+
+    def _field_with_ai(
+        self, field_widget: QWidget, field: str, *, flesh_out: bool = False
+    ) -> QWidget:
+        container = QWidget()
+        layout = QHBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(field_widget, 1)
+        generate_button = QPushButton("Generate with AI")
+        generate_button.clicked.connect(
+            lambda: self._start_field_generation(field, generate_button, flesh_out=False)
+        )
+        layout.addWidget(generate_button)
+        if flesh_out:
+            flesh_button = QPushButton("Flesh out with AI")
+            flesh_button.clicked.connect(
+                lambda: self._start_field_generation(field, flesh_button, flesh_out=True)
+            )
+            layout.addWidget(flesh_button)
+        return container
+
+    def _existing_fields(self) -> dict[str, str]:
+        return {
+            "name": self.name_input.text().strip(),
+            "role": self.role_input.toPlainText().strip(),
+            "personality": self.personality_input.toPlainText().strip(),
+            "background": self.background_input.toPlainText().strip(),
+            "goals": self.goals_input.toPlainText().strip(),
+            "public_knowledge": self.public_knowledge_input.toPlainText().strip(),
+            "mood": self.mood_input.currentText().strip(),
+            "speaking_style": self.style_input.currentText().strip(),
+            "gemini_voice": self.voice_input.currentText(),
+        }
+
+    def _start_field_generation(self, field: str, button: QPushButton, *, flesh_out: bool) -> None:
+        try:
+            api_key = self._credentials.get_gemini_api_key()
+        except ValueError as exc:
+            QMessageBox.critical(self, "Credential error", str(exc))
+            return
+        if not api_key:
+            QMessageBox.information(
+                self,
+                "Gemini API key required",
+                "Store a Gemini API key from the main window before using AI generation.",
+            )
+            return
+        button.setEnabled(False)
+        original_label = button.text()
+        button.setText("Generating…")
+        asyncio.create_task(
+            self._generate_field(api_key, field, button, original_label, flesh_out=flesh_out)
+        )
+
+    async def _generate_field(
+        self,
+        api_key: str,
+        field: str,
+        button: QPushButton,
+        original_label: str,
+        *,
+        flesh_out: bool,
+    ) -> None:
+        try:
+            value = await generate_npc_field(
+                api_key, field, self._existing_fields(), flesh_out=flesh_out
+            )
+            self._set_field(field, value)
+        except Exception as exc:
+            QMessageBox.critical(self, "NPC generation error", str(exc))
+        finally:
+            button.setEnabled(True)
+            button.setText(original_label)
+
+    def _set_field(self, field: str, value: str) -> None:
+        text_fields = {
+            "name": self.name_input,
+            "role": self.role_input,
+            "personality": self.personality_input,
+            "background": self.background_input,
+            "goals": self.goals_input,
+            "public_knowledge": self.public_knowledge_input,
+        }
+        widget = text_fields.get(field)
+        if isinstance(widget, QLineEdit):
+            widget.setText(value)
+        elif isinstance(widget, QTextEdit):
+            widget.setPlainText(value)
+        elif field == "mood":
+            self.mood_input.setCurrentText(value)
+        elif field == "speaking_style":
+            self.style_input.setCurrentText(value)
+        elif field == "gemini_voice":
+            if self.voice_input.findText(value) < 0:
+                self.voice_input.addItem(value)
+            self.voice_input.setCurrentText(value)
 
     def _suggest_id(self, name: str) -> None:
         if self.id_input.isModified():
@@ -108,23 +217,14 @@ class NpcDialog(QDialog):
         asyncio.create_task(self._expand_with_ai(api_key))
 
     async def _expand_with_ai(self, api_key: str) -> None:
-        existing = {
-            "name": self.name_input.text().strip(),
-            "role": self.role_input.toPlainText().strip(),
-            "personality": self.personality_input.toPlainText().strip(),
-            "background": self.background_input.toPlainText().strip(),
-            "goals": self.goals_input.toPlainText().strip(),
-            "public_knowledge": self.public_knowledge_input.toPlainText().strip(),
-            "mood": self.mood_input.currentText().strip(),
-            "speaking_style": self.style_input.currentText().strip(),
-        }
         try:
-            expansion = await expand_npc(api_key, existing)
+            expansion = await expand_npc(api_key, self._existing_fields())
         except Exception as exc:
             QMessageBox.critical(self, "NPC generation error", str(exc))
         else:
             preview = (
-                f"Role\n{expansion.role}\n\nPersonality\n{expansion.personality}\n\n"
+                f"Name\n{expansion.name}\n\nRole\n{expansion.role}\n\n"
+                f"Personality\n{expansion.personality}\n\n"
                 f"Background\n{expansion.background}\n\nGoals\n{expansion.goals}\n\n"
                 f"Public knowledge\n{expansion.public_knowledge}\n\n"
                 f"Mood\n{expansion.mood}\n\nSpeaking style\n{expansion.speaking_style}"
@@ -139,9 +239,10 @@ class NpcDialog(QDialog):
                 self._apply_expansion(expansion)
         finally:
             self.ai_expand_button.setEnabled(True)
-            self.ai_expand_button.setText("Generate or expand with AI")
+            self.ai_expand_button.setText("Generate this NPC with AI")
 
     def _apply_expansion(self, expansion: NpcExpansion) -> None:
+        self.name_input.setText(expansion.name)
         self.role_input.setPlainText(expansion.role)
         self.personality_input.setPlainText(expansion.personality)
         self.background_input.setPlainText(expansion.background)
