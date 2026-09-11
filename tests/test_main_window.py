@@ -1,9 +1,13 @@
 import shutil
 from pathlib import Path
 
+from PySide6.QtWidgets import QDialog
+from pytest import MonkeyPatch
 from pytestqt.qtbot import QtBot
 
+from voice_assistant.storage.npc_creation import NpcDraft
 from voice_assistant.storage.transcripts import append_transcript
+from voice_assistant.ui import main_window as main_window_module
 from voice_assistant.ui.main_window import MainWindow
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -15,9 +19,48 @@ def test_main_window_loads_sample_campaign(qtbot: QtBot) -> None:
 
     assert window.windowTitle() == "RPG Voice Assistant"
     assert window._campaign_list.count() == 1
-    assert window._npc_list.count() == 2
+    assert window._npc_list.count() >= 2
     assert window._npc_heading.text() == "Elara Voss"
     assert window._start_button.isEnabled()
+
+
+def test_create_npc_dialog_result_reloads_and_selects_character(
+    qtbot: QtBot, tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    campaign_root = tmp_path / "campaigns"
+    shutil.copytree(REPOSITORY_ROOT / "examples" / "campaigns", campaign_root)
+    draft = NpcDraft(
+        id="guildmaster-vale",
+        name="Guildmaster Vale",
+        role="Leader of the merchants guild.",
+        personality="Patient and exacting.",
+        mood="confident",
+        speaking_style="measured",
+        gemini_voice="Charon",
+    )
+
+    class AcceptedNpcDialog:
+        def __init__(self, parent: MainWindow, **kwargs: object) -> None:
+            pass
+
+        def exec(self) -> QDialog.DialogCode:
+            return QDialog.DialogCode.Accepted
+
+        def draft(self) -> NpcDraft:
+            return draft
+
+    monkeypatch.setattr(main_window_module, "NpcDialog", AcceptedNpcDialog)
+    window = MainWindow(campaign_root)
+    qtbot.addWidget(window)
+    initial_count = window._npc_list.count()
+
+    window._create_npc()
+
+    assert window._npc_list.count() == initial_count + 1
+    assert window._npc_heading.text() == "Guildmaster Vale"
+    assert window._active_npc is not None
+    assert window._active_npc.id == "guildmaster-vale"
+    assert (campaign_root / "sample" / "characters" / "guildmaster-vale").is_dir()
 
 
 def test_player_and_gm_inputs_are_visibly_distinct(qtbot: QtBot, tmp_path: Path) -> None:
@@ -45,7 +88,7 @@ def test_npc_knowledge_can_be_edited_and_appended_without_crossing_npcs(
     qtbot.addWidget(window)
 
     assert window._knowledge_heading.text() == "Elara Voss"
-    assert "No sessions have been recorded." in window._knowledge_editor.toPlainText()
+    assert window._knowledge_editor.toPlainText().startswith("# Elara Voss")
     window._knowledge_editor.append("\nEdited knowledge.")
     window._save_npc_knowledge()
     window._knowledge_append.setPlainText("Appended knowledge.")

@@ -7,6 +7,7 @@ from pathlib import Path
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
+    QDialog,
     QFileDialog,
     QFormLayout,
     QHBoxLayout,
@@ -26,11 +27,13 @@ from PySide6.QtWidgets import (
 
 from voice_assistant.domain.models import Campaign, Npc
 from voice_assistant.services.voice_session import VoiceSessionController
-from voice_assistant.storage.campaigns import discover_campaigns
+from voice_assistant.storage.campaigns import discover_campaigns, load_campaign
 from voice_assistant.storage.credentials import CredentialStore
 from voice_assistant.storage.lore import save_lore
+from voice_assistant.storage.npc_creation import create_npc
 from voice_assistant.storage.npc_knowledge import append_npc_knowledge, save_npc_knowledge
 from voice_assistant.storage.transcripts import append_transcript, load_transcript
+from voice_assistant.ui.npc_dialog import NpcDialog
 
 
 class MainWindow(QMainWindow):
@@ -78,6 +81,10 @@ class MainWindow(QMainWindow):
         self._npc_list = QListWidget()
         self._npc_list.currentRowChanged.connect(self._select_npc)
         selection_layout.addWidget(self._npc_list)
+        self._add_npc_button = QPushButton("Create NPC")
+        self._add_npc_button.setEnabled(False)
+        self._add_npc_button.clicked.connect(self._create_npc)
+        selection_layout.addWidget(self._add_npc_button)
         splitter.addWidget(selection)
 
         tabs = QTabWidget()
@@ -230,6 +237,7 @@ class MainWindow(QMainWindow):
         self._lore_editor.clear()
         self._lore_editor.setEnabled(False)
         self._save_lore_button.setEnabled(False)
+        self._add_npc_button.setEnabled(self._active_campaign is not None)
         if self._active_campaign is None:
             return
         for npc in self._active_campaign.npcs:
@@ -248,6 +256,30 @@ class MainWindow(QMainWindow):
             0,
         )
         self._npc_list.setCurrentRow(default_index)
+
+    def _create_npc(self) -> None:
+        if self._active_campaign is None:
+            return
+        dialog = NpcDialog(self, credentials=self._credentials)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        try:
+            draft = dialog.draft()
+            create_npc(self._active_campaign.directory, draft)
+            updated_campaign = load_campaign(self._active_campaign.directory)
+        except ValueError as exc:
+            QMessageBox.critical(self, "NPC creation error", str(exc))
+            return
+        campaign_index = self._campaigns.index(self._active_campaign)
+        campaigns = list(self._campaigns)
+        campaigns[campaign_index] = updated_campaign
+        self._campaigns = tuple(campaigns)
+        self._select_campaign(campaign_index)
+        new_row = next(
+            index for index, npc in enumerate(updated_campaign.npcs) if npc.id == draft.id
+        )
+        self._npc_list.setCurrentRow(new_row)
+        self.statusBar().showMessage(f"Created NPC: {draft.name}")
 
     def _select_npc(self, row: int) -> None:
         if self._voice_session.active:

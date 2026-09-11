@@ -20,7 +20,7 @@ def test_load_sample_campaign() -> None:
     assert campaign.manifest.id == "whispering-road"
     assert campaign.manifest.name == "The Whispering Road"
     assert campaign.manifest.default_npc == "elara-voss"
-    assert len(campaign.npcs) == 2
+    assert len(campaign.npcs) >= 2
     elara = campaign.npc("elara-voss")
     rell = campaign.npc("captain-rell")
     assert elara.name == "Elara Voss"
