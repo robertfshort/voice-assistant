@@ -14,3 +14,5 @@
 {"timestamp": "2026-09-11T17:33:00.636547Z", "speaker": "gm request", "text": "describe yourself to the players", "private": true}
 {"timestamp": "2026-09-11T17:33:21.440496Z", "speaker": "npc", "text": "You see a woman with dark hair, pulled back, though some strands cover one ear. Her eyes are watchful, and she moves with practiced ease behind the bar. There’s a faded scar on her forehead, partially concealed. She serves drinks and keeps an eye out. What would you like to order?", "private": false}
 {"timestamp": "2026-09-11T17:55:58.486254Z", "speaker": "player", "text": "What is the name of the guild master of the Trade Nexus?", "private": false}
+{"timestamp": "2026-09-11T19:03:10.373988Z", "speaker": "player", "text": "what can you tell me about Captain Rell?", "private": false}
+{"timestamp": "2026-09-11T19:03:18.610417Z", "speaker": "npc", "text": "Good detective, for the city. Unfortunately. Makes getting things done difficult. Why do you ask?", "private": false}
