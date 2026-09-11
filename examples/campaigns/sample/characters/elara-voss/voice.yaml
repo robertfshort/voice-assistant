@@ -1,0 +1,6 @@
+style: guarded, measured, dry humor
+providers:
+  gemini:
+    voice: Aoede
+  local-piper:
+    voice: en_GB-alba-medium

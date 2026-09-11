@@ -1,0 +1,9 @@
+storage:
+  campaign_root: ""
+  portable_mode: false
+
+providers:
+  conversation: gemini
+  transcription: gemini-live
+  speech: gemini-live
+
