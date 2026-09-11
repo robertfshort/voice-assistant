@@ -9,6 +9,27 @@ description = "Portable tabletop RPG narration and conversational NPC desktop ap
 readme = "README.md"
 requires-python = ">=3.12"
 license = "MIT"
+dependencies = [
+    "PySide6-Essentials>=6.7,<7",
+    "keyring>=25,<26",
+    "platformdirs>=4,<5",
+    "pydantic>=2.9,<3",
+    "PyYAML>=6,<7",
+    "qasync>=0.27,<1",
+    "roomkit[local-audio,realtime-gemini]>=0.47",
+]
+
+[dependency-groups]
+dev = [
+    "bandit>=1.7,<2",
+    "mypy>=1.11,<2",
+    "pytest>=8,<10",
+    "pytest-qt>=4.4,<5",
+    "ruff>=0.6,<1",
+]
+
+[project.scripts]
+voice-assistant = "voice_assistant.app:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/voice_assistant"]
@@ -23,3 +44,15 @@ src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "UP", "B", "SIM"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+
+[[tool.mypy.overrides]]
+module = ["PySide6.*", "yaml"]
+ignore_missing_imports = true
+
+[tool.bandit]
+exclude_dirs = ["tests"]
+skips = ["B101"]
