@@ -89,6 +89,10 @@ class MainWindow(QMainWindow):
         self._edit_npc_button.setEnabled(False)
         self._edit_npc_button.clicked.connect(self._edit_npc)
         selection_layout.addWidget(self._edit_npc_button)
+        self._duplicate_npc_button = QPushButton("Duplicate NPC")
+        self._duplicate_npc_button.setEnabled(False)
+        self._duplicate_npc_button.clicked.connect(self._duplicate_npc)
+        selection_layout.addWidget(self._duplicate_npc_button)
         splitter.addWidget(selection)
 
         tabs = QTabWidget()
@@ -221,6 +225,7 @@ class MainWindow(QMainWindow):
         self._npc_heading.setText("No NPC selected")
         self._knowledge_heading.setText("No NPC selected")
         self._edit_npc_button.setEnabled(False)
+        self._duplicate_npc_button.setEnabled(False)
         for campaign in self._campaigns:
             self._campaign_list.addItem(campaign.manifest.name)
         if self._campaigns:
@@ -317,6 +322,51 @@ class MainWindow(QMainWindow):
         self._npc_list.setCurrentRow(row)
         self.statusBar().showMessage(f"Updated NPC: {draft.name}")
 
+    def _duplicate_npc(self) -> None:
+        if self._active_campaign is None or self._active_npc is None:
+            return
+        source = self._active_npc
+        default_id = f"{source.id}-copy"
+        new_id, accepted = QInputDialog.getText(
+            self,
+            "Duplicate NPC",
+            "New stable ID for the copy",
+            text=default_id,
+        )
+        new_id = new_id.strip()
+        if not accepted or not new_id:
+            return
+        if new_id == source.id:
+            QMessageBox.critical(
+                self, "Duplicate NPC error", "The new ID must differ from the original."
+            )
+            return
+        template = draft_from_npc(source).model_copy(
+            update={"id": new_id, "name": f"Copy of {source.name}"}
+        )
+        dialog = NpcDialog(self, credentials=self._credentials, draft=template)
+        dialog.setWindowTitle("Duplicate NPC")
+        dialog.id_input.setEnabled(True)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        try:
+            draft = dialog.draft()
+            create_npc(self._active_campaign.directory, draft)
+            updated_campaign = load_campaign(self._active_campaign.directory)
+        except ValueError as exc:
+            QMessageBox.critical(self, "Duplicate NPC error", str(exc))
+            return
+        campaign_index = self._campaigns.index(self._active_campaign)
+        campaigns = list(self._campaigns)
+        campaigns[campaign_index] = updated_campaign
+        self._campaigns = tuple(campaigns)
+        self._select_campaign(campaign_index)
+        new_row = next(
+            index for index, npc in enumerate(updated_campaign.npcs) if npc.id == draft.id
+        )
+        self._npc_list.setCurrentRow(new_row)
+        self.statusBar().showMessage(f"Duplicated NPC: {draft.name}")
+
     def _select_npc(self, row: int) -> None:
         if self._voice_session.active:
             self._player_input.setEnabled(False)
@@ -327,6 +377,7 @@ class MainWindow(QMainWindow):
         else:
             self._active_npc = self._active_campaign.npcs[row]
         self._edit_npc_button.setEnabled(self._active_npc is not None)
+        self._duplicate_npc_button.setEnabled(self._active_npc is not None)
         if self._active_npc is None:
             self._npc_heading.setText("No NPC selected")
             self._knowledge_heading.setText("No NPC selected")

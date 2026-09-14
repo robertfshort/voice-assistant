@@ -63,6 +63,50 @@ def test_create_npc_dialog_result_reloads_and_selects_character(
     assert (campaign_root / "sample" / "characters" / "guildmaster-vale").is_dir()
 
 
+def test_duplicate_npc_creates_a_copy(
+    qtbot: QtBot, tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    campaign_root = tmp_path / "campaigns"
+    shutil.copytree(REPOSITORY_ROOT / "examples" / "campaigns", campaign_root)
+    source = NpcDraft(
+        id="elara-copy",
+        name="Copy of Elara Voss",
+        role="Tavern keeper",
+        personality="Guarded",
+        gemini_voice="Aoede",
+    )
+
+    class DuplicateDialog:
+        def __init__(self, parent: object, *, credentials: object, draft: NpcDraft) -> None:
+            pass
+
+        def setWindowTitle(self, title: str) -> None:  # noqa: N802
+            pass
+
+        id_input = type("Input", (), {"setEnabled": lambda self, *args: None})
+
+        def exec(self) -> QDialog.DialogCode:
+            return QDialog.DialogCode.Accepted
+
+        def draft(self) -> NpcDraft:
+            return source
+
+    monkeypatch.setattr(
+        main_window_module.QInputDialog, "getText", lambda *a, **k: ("elara-copy", True)
+    )
+    monkeypatch.setattr(main_window_module, "NpcDialog", DuplicateDialog)
+    window = MainWindow(campaign_root)
+    qtbot.addWidget(window)
+    initial_count = window._npc_list.count()
+
+    window._duplicate_npc()
+
+    assert window._npc_list.count() == initial_count + 1
+    assert (campaign_root / "sample" / "characters" / "elara-copy").is_dir()
+    assert window._active_npc is not None
+    assert window._active_npc.id == "elara-copy"
+
+
 def test_player_and_gm_inputs_are_visibly_distinct(qtbot: QtBot, tmp_path: Path) -> None:
     campaign_root = tmp_path / "campaigns"
     shutil.copytree(REPOSITORY_ROOT / "examples" / "campaigns", campaign_root)
