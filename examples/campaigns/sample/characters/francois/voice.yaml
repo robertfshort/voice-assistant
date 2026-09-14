@@ -1,0 +1,6 @@
+style: neutral, Generally speaks with a new orleans creole accent. Occasionally with
+  switch to french for emphasis and even translate if he is speaking down to someone,
+  which is often
+providers:
+  gemini:
+    voice: Puck
