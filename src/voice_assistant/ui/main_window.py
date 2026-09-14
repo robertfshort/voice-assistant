@@ -34,7 +34,7 @@ from voice_assistant.domain.models import Campaign, Npc, SpeakerProfile
 from voice_assistant.services.conversation import explain_npc_lore
 from voice_assistant.services.session_notes import SessionNotes, propose_session_notes
 from voice_assistant.services.spell_check import CampaignSpellCheck
-from voice_assistant.services.voice_preview import preview_voice, tts_segments
+from voice_assistant.services.text_to_speech import speak_text
 from voice_assistant.services.voice_session import VoiceSessionController
 from voice_assistant.storage.campaigns import create_campaign, discover_campaigns, load_campaign
 from voice_assistant.storage.credentials import CredentialStore
@@ -631,7 +631,11 @@ class MainWindow(QMainWindow):
     def _create_npc(self) -> None:
         if self._active_campaign is None:
             return
-        dialog = NpcDialog(self, credentials=self._credentials)
+        dialog = NpcDialog(
+            self,
+            credentials=self._credentials,
+            voice_base_directory=str(self._active_campaign.directory),
+        )
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         try:
@@ -658,7 +662,10 @@ class MainWindow(QMainWindow):
             return
         npc_id = self._active_npc.id
         dialog = NpcDialog(
-            self, credentials=self._credentials, draft=draft_from_npc(self._active_npc)
+            self,
+            credentials=self._credentials,
+            draft=draft_from_npc(self._active_npc),
+            voice_base_directory=str(self._active_campaign.directory),
         )
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
@@ -715,7 +722,12 @@ class MainWindow(QMainWindow):
         template = draft_from_npc(source).model_copy(
             update={"id": new_id, "name": f"Copy of {source.name}"}
         )
-        dialog = NpcDialog(self, credentials=self._credentials, draft=template)
+        dialog = NpcDialog(
+            self,
+            credentials=self._credentials,
+            draft=template,
+            voice_base_directory=str(self._active_campaign.directory),
+        )
         dialog.setWindowTitle("Duplicate NPC")
         dialog.id_input.setEnabled(True)
         if dialog.exec() != QDialog.DialogCode.Accepted:
@@ -877,7 +889,8 @@ class MainWindow(QMainWindow):
         self._start_button.setEnabled(True)
         self._inspect_button.setEnabled(True)
         self._session_notes_button.setEnabled(True)
-        self._speak_as_npc_button.setEnabled("gemini" in self._active_npc.voice.providers)
+        provider = self._active_npc.voice.preferred_provider
+        self._speak_as_npc_button.setEnabled(provider in self._active_npc.voice.providers)
 
     def _replace_active_npc_memory(self, memory: str) -> None:
         if self._active_campaign is None or self._active_npc is None:
@@ -1302,26 +1315,13 @@ class MainWindow(QMainWindow):
     def _on_speak_as_npc(self) -> None:
         if self._active_npc is None:
             return
-        try:
-            api_key = self._credentials.get_gemini_api_key()
-        except ValueError as exc:
-            QMessageBox.critical(self, "Credential error", str(exc))
-            return
-        if not api_key:
-            QMessageBox.information(
-                self,
-                "Gemini API key required",
-                "Store a Gemini API key before using text-to-speech.",
-            )
-            return
-        gemini = self._active_npc.voice.providers.get("gemini")
-        if gemini is None:
-            QMessageBox.information(
-                self,
-                "No Gemini voice",
-                "This NPC has no Gemini voice configured. Edit the NPC and choose a voice.",
-            )
-            return
+        api_key = ""
+        if self._active_npc.voice.preferred_provider == "gemini":
+            try:
+                api_key = self._credentials.get_gemini_api_key() or ""
+            except ValueError as exc:
+                QMessageBox.critical(self, "Credential error", str(exc))
+                return
         text, accepted = QInputDialog.getMultiLineText(
             self,
             "Speak as NPC",
@@ -1331,15 +1331,18 @@ class MainWindow(QMainWindow):
             return
         self._speak_as_npc_button.setEnabled(False)
         self._speak_as_npc_button.setText("Speaking…")
-        asyncio.create_task(self._speak_as_npc_text(api_key, gemini.voice, text.strip()))
+        asyncio.create_task(self._speak_as_npc_text(api_key, text.strip()))
 
-    async def _speak_as_npc_text(self, api_key: str, voice: str, text: str) -> None:
+    async def _speak_as_npc_text(self, api_key: str, text: str) -> None:
         try:
-            if self._active_npc is None:
+            if self._active_npc is None or self._active_campaign is None:
                 return
-            style = self._active_npc.voice.style
-            for mood, segment in tts_segments(text):
-                await preview_voice(api_key, voice, mood, style, text=segment)
+            await speak_text(
+                self._active_npc.voice,
+                text,
+                base_directory=self._active_campaign.directory,
+                api_key=api_key,
+            )
         except Exception as exc:
             QMessageBox.critical(self, "TTS error", str(exc))
         finally:

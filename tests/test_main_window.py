@@ -82,7 +82,14 @@ def test_duplicate_npc_creates_a_copy(
     )
 
     class DuplicateDialog:
-        def __init__(self, parent: object, *, credentials: object, draft: NpcDraft) -> None:
+        def __init__(
+            self,
+            parent: object,
+            *,
+            credentials: object,
+            draft: NpcDraft,
+            voice_base_directory: str,
+        ) -> None:
             pass
 
         def setWindowTitle(self, title: str) -> None:  # noqa: N802

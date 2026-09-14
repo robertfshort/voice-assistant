@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import re
+from pathlib import Path
 
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
@@ -9,6 +10,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
     QDialogButtonBox,
+    QDoubleSpinBox,
     QFileDialog,
     QFormLayout,
     QHBoxLayout,
@@ -16,11 +18,13 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMessageBox,
     QPushButton,
+    QSpinBox,
     QTextEdit,
     QVBoxLayout,
     QWidget,
 )
 
+from voice_assistant.domain.models import VoiceConfig, VoiceProviderConfig
 from voice_assistant.services.gemini_voices import (
     GEMINI_GENDERS,
     gender_for_voice,
@@ -31,7 +35,7 @@ from voice_assistant.services.npc_generation import (
     expand_npc,
     generate_npc_field,
 )
-from voice_assistant.services.voice_preview import preview_voice
+from voice_assistant.services.text_to_speech import speak_text
 from voice_assistant.storage.credentials import CredentialStore
 from voice_assistant.storage.npc_creation import NpcDraft
 
@@ -43,9 +47,11 @@ class NpcDialog(QDialog):
         *,
         credentials: CredentialStore | None = None,
         draft: NpcDraft | None = None,
+        voice_base_directory: str = ".",
     ) -> None:
         super().__init__(parent)
         self._credentials = credentials or CredentialStore()
+        self._voice_base_directory = voice_base_directory
         self._pending_generations: dict[str, asyncio.Task[None]] = {}
         self._pending_expansion: asyncio.Task[None] | None = None
         self.setWindowTitle("Create NPC")
@@ -89,9 +95,33 @@ class NpcDialog(QDialog):
         self.style_input.addItems(
             ("natural", "measured", "conversational", "formal", "terse", "animated")
         )
+        self.voice_provider_input = QComboBox()
+        self.voice_provider_input.addItems(("gemini", "piper"))
         self.voice_gender_input = QComboBox()
         self.voice_gender_input.addItems(GEMINI_GENDERS)
         self.voice_input = QComboBox()
+        self.piper_model_input = QLineEdit()
+        self.piper_model_button = QPushButton("Browse…")
+        self.piper_model_button.clicked.connect(self._browse_piper_model)
+        self.piper_config_input = QLineEdit()
+        self.piper_config_button = QPushButton("Browse…")
+        self.piper_config_button.clicked.connect(self._browse_piper_config)
+        self.piper_speaker_input = QSpinBox()
+        self.piper_speaker_input.setRange(-1, 999)
+        self.piper_speaker_input.setSpecialValueText("Default")
+        self.piper_speaker_input.setValue(-1)
+        self.piper_length_input = QDoubleSpinBox()
+        self.piper_length_input.setRange(0.1, 5.0)
+        self.piper_length_input.setValue(1.0)
+        self.piper_length_input.setSingleStep(0.05)
+        self.piper_noise_input = QDoubleSpinBox()
+        self.piper_noise_input.setRange(0.0, 2.0)
+        self.piper_noise_input.setValue(0.667)
+        self.piper_noise_input.setSingleStep(0.05)
+        self.piper_noise_w_input = QDoubleSpinBox()
+        self.piper_noise_w_input.setRange(0.0, 2.0)
+        self.piper_noise_w_input.setValue(0.8)
+        self.piper_noise_w_input.setSingleStep(0.05)
 
         form.addRow("Name", self._field_with_ai(self.name_input, "name"))
         form.addRow("Stable ID", self.id_input)
@@ -113,9 +143,20 @@ class NpcDialog(QDialog):
         form.addRow("Current location", self.location_input)
         form.addRow("Relationships", self.relationships_input)
         form.addRow("Mood", self._field_with_ai(self.mood_input, "mood"))
+        form.addRow("Preferred TTS", self.voice_provider_input)
         form.addRow("Speaking style", self._field_with_ai(self.style_input, "speaking_style"))
         form.addRow("Voice gender", self.voice_gender_input)
         form.addRow("Gemini voice", self._field_with_ai(self.voice_input, "gemini_voice"))
+        form.addRow(
+            "Piper model", self._path_field(self.piper_model_input, self.piper_model_button)
+        )
+        form.addRow(
+            "Piper config", self._path_field(self.piper_config_input, self.piper_config_button)
+        )
+        form.addRow("Piper speaker", self.piper_speaker_input)
+        form.addRow("Piper length scale", self.piper_length_input)
+        form.addRow("Piper noise scale", self.piper_noise_input)
+        form.addRow("Piper noise width", self.piper_noise_w_input)
 
         self.portrait_input = QLineEdit()
         self.portrait_input.setReadOnly(True)
@@ -174,11 +215,41 @@ class NpcDialog(QDialog):
         self.relationships_input.setPlainText(draft.relationships)
         self.mood_input.setCurrentText(draft.mood)
         self.style_input.setCurrentText(draft.speaking_style)
+        self.voice_provider_input.setCurrentText(draft.preferred_voice_provider)
         self._set_voice(draft.gemini_voice)
+        self.piper_model_input.setText(draft.piper_model)
+        self.piper_config_input.setText(draft.piper_config)
+        self.piper_speaker_input.setValue(
+            draft.piper_speaker_id if draft.piper_speaker_id is not None else -1
+        )
+        self.piper_length_input.setValue(draft.piper_length_scale)
+        self.piper_noise_input.setValue(draft.piper_noise_scale)
+        self.piper_noise_w_input.setValue(draft.piper_noise_w)
         if draft.portrait:
             self.portrait_input.setText(draft.portrait)
             self._load_portrait_preview(draft.portrait)
         self.archived_input.setChecked(draft.archived)
+
+    def _path_field(self, field: QLineEdit, button: QPushButton) -> QWidget:
+        container = QWidget()
+        layout = QHBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(field, 1)
+        layout.addWidget(button)
+        return container
+
+    def _browse_piper_model(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(self, "Select Piper model", "", "ONNX (*.onnx)")
+        if path:
+            self.piper_model_input.setText(path)
+            default_config = f"{path}.json"
+            if not self.piper_config_input.text() and Path(default_config).is_file():
+                self.piper_config_input.setText(default_config)
+
+    def _browse_piper_config(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(self, "Select Piper config", "", "JSON (*.json)")
+        if path:
+            self.piper_config_input.setText(path)
 
     def _browse_portrait(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
@@ -277,18 +348,13 @@ class NpcDialog(QDialog):
         }
 
     def _start_voice_preview(self) -> None:
-        try:
-            api_key = self._credentials.get_gemini_api_key()
-        except ValueError as exc:
-            QMessageBox.critical(self, "Credential error", str(exc))
-            return
-        if not api_key:
-            QMessageBox.information(
-                self,
-                "Gemini API key required",
-                "Store a Gemini API key from the main window before testing a voice.",
-            )
-            return
+        api_key = ""
+        if self.voice_provider_input.currentText() == "gemini":
+            try:
+                api_key = self._credentials.get_gemini_api_key() or ""
+            except ValueError as exc:
+                QMessageBox.critical(self, "Credential error", str(exc))
+                return
         self.voice_preview_button.setEnabled(False)
         self.voice_preview_button.setText("Playing preview…")
         asyncio.create_task(self._preview_voice(api_key))
@@ -296,12 +362,32 @@ class NpcDialog(QDialog):
     async def _preview_voice(self, api_key: str) -> None:
         name = self.name_input.text().strip() or "this character"
         try:
-            await preview_voice(
-                api_key,
-                self.voice_input.currentText(),
-                self.mood_input.currentText().strip(),
-                self.style_input.currentText().strip(),
-                text=f"Greetings. I am {name}. This is how I will sound at the table.",
+            piper = VoiceProviderConfig(
+                model=self.piper_model_input.text().strip(),
+                config=self.piper_config_input.text().strip(),
+                speaker_id=(
+                    self.piper_speaker_input.value()
+                    if self.piper_speaker_input.value() >= 0
+                    else None
+                ),
+                length_scale=self.piper_length_input.value(),
+                noise_scale=self.piper_noise_input.value(),
+                noise_w=self.piper_noise_w_input.value(),
+            )
+            voice = VoiceConfig(
+                style=self.style_input.currentText().strip(),
+                preferred_provider=self.voice_provider_input.currentText(),
+                providers={
+                    "gemini": VoiceProviderConfig(voice=self.voice_input.currentText()),
+                    "piper": piper,
+                },
+            )
+            await speak_text(
+                voice,
+                f"[[{self.mood_input.currentText().strip()}]] Greetings. I am {name}. "
+                "This is how I will sound at the table.",
+                base_directory=Path(self._voice_base_directory),
+                api_key=api_key,
             )
         except Exception as exc:
             QMessageBox.critical(self, "Voice preview error", str(exc))
@@ -452,7 +538,16 @@ class NpcDialog(QDialog):
             location=self.location_input.text().strip(),
             mood=self.mood_input.currentText().strip(),
             speaking_style=self.style_input.currentText().strip(),
+            preferred_voice_provider=self.voice_provider_input.currentText(),
             gemini_voice=self.voice_input.currentText(),
+            piper_model=self.piper_model_input.text().strip(),
+            piper_config=self.piper_config_input.text().strip(),
+            piper_speaker_id=(
+                self.piper_speaker_input.value() if self.piper_speaker_input.value() >= 0 else None
+            ),
+            piper_length_scale=self.piper_length_input.value(),
+            piper_noise_scale=self.piper_noise_input.value(),
+            piper_noise_w=self.piper_noise_w_input.value(),
             portrait=self.portrait_input.text().strip() or None,
             archived=self.archived_input.isChecked(),
         )

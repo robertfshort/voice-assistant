@@ -51,7 +51,14 @@ class NpcDraft(BaseModel):
     affiliations: str = ""
     mood: str = "neutral"
     speaking_style: str = "natural"
+    preferred_voice_provider: str = "gemini"
     gemini_voice: str = "Aoede"
+    piper_model: str = ""
+    piper_config: str = ""
+    piper_speaker_id: int | None = None
+    piper_length_scale: float = 1.0
+    piper_noise_scale: float = 0.667
+    piper_noise_w: float = 0.8
     portrait: str | None = None
     archived: bool = False
     home: str = ""
@@ -66,15 +73,9 @@ def _profile(draft: NpcDraft) -> str:
         else ""
     )
     status = "\n\n## Status\n\nArchived" if draft.archived else ""
-    home = (
-        f"\n\n## Home region\n\n{draft.home.strip()}"
-        if draft.home.strip()
-        else ""
-    )
+    home = f"\n\n## Home region\n\n{draft.home.strip()}" if draft.home.strip() else ""
     location = (
-        f"\n\n## Current location\n\n{draft.location.strip()}"
-        if draft.location.strip()
-        else ""
+        f"\n\n## Current location\n\n{draft.location.strip()}" if draft.location.strip() else ""
     )
     relationships = (
         f"\n\n## Relationships\n\n{draft.relationships.strip()}"
@@ -111,6 +112,18 @@ def _voice(draft: NpcDraft, existing: dict[str, object] | None = None) -> dict[s
     gemini = dict(gemini_value) if isinstance(gemini_value, dict) else {}
     gemini["voice"] = draft.gemini_voice
     providers["gemini"] = gemini
+    if draft.piper_model:
+        providers["piper"] = {
+            "model": draft.piper_model,
+            "config": draft.piper_config,
+            "speaker_id": draft.piper_speaker_id,
+            "length_scale": draft.piper_length_scale,
+            "noise_scale": draft.piper_noise_scale,
+            "noise_w": draft.piper_noise_w,
+        }
+    else:
+        providers.pop("piper", None)
+    voice["preferred_provider"] = draft.preferred_voice_provider
     voice["style"] = ", ".join(
         value for value in (draft.mood.strip(), draft.speaking_style.strip()) if value
     )
@@ -171,6 +184,7 @@ def draft_from_npc(npc: Npc) -> NpcDraft:
     voice = npc.voice
     style_parts = [part.strip() for part in voice.style.split(",") if part.strip()]
     provider = voice.providers.get("gemini")
+    piper = voice.providers.get("piper")
     return NpcDraft(
         id=npc.id,
         name=npc.name,
@@ -182,7 +196,14 @@ def draft_from_npc(npc: Npc) -> NpcDraft:
         affiliations=sections.get("affiliations", ""),
         mood=style_parts[0] if style_parts else "neutral",
         speaking_style=sections.get("speaking style", "natural"),
+        preferred_voice_provider=voice.preferred_provider,
         gemini_voice=provider.voice if provider else "Aoede",
+        piper_model=piper.model if piper else "",
+        piper_config=piper.config if piper else "",
+        piper_speaker_id=piper.speaker_id if piper else None,
+        piper_length_scale=piper.length_scale if piper else 1.0,
+        piper_noise_scale=piper.noise_scale if piper else 0.667,
+        piper_noise_w=piper.noise_w if piper else 0.8,
         portrait=(npc.directory / npc.portrait).as_posix() if npc.portrait else None,
         archived=sections.get("status", "").lower() == "archived",
         home=sections.get("home region", ""),

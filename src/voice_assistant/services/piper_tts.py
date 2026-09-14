@@ -1,0 +1,75 @@
+from __future__ import annotations
+
+import asyncio
+import importlib
+from pathlib import Path
+from typing import Any
+
+from voice_assistant.domain.models import VoiceProviderConfig
+
+_VOICES: dict[tuple[Path, Path | None], Any] = {}
+_MOOD_OVERRIDES = {
+    "whisper": (1.15, 0.45),
+    "nervously": (0.92, 0.8),
+    "shout": (0.85, 0.75),
+}
+
+
+def resolve_voice_path(path: str, base_directory: Path) -> Path:
+    candidate = Path(path).expanduser()
+    if not candidate.is_absolute():
+        candidate = base_directory / candidate
+    return candidate.resolve()
+
+
+def _load_voice(model: Path, config: Path | None) -> Any:
+    key = (model, config)
+    if key not in _VOICES:
+        piper = importlib.import_module("piper")
+        _VOICES[key] = piper.PiperVoice.load(model, config_path=config)
+    return _VOICES[key]
+
+
+def _synthesize(config: VoiceProviderConfig, base_directory: Path, text: str, mood: str) -> None:
+    if not config.model:
+        raise ValueError("No Piper model is configured for this NPC")
+    model = resolve_voice_path(config.model, base_directory)
+    config_path = resolve_voice_path(config.config, base_directory) if config.config else None
+    if not model.is_file():
+        raise FileNotFoundError(f"Piper model not found: {model}")
+    if config_path is not None and not config_path.is_file():
+        raise FileNotFoundError(f"Piper config not found: {config_path}")
+
+    piper = importlib.import_module("piper")
+    length_scale, noise_scale = _MOOD_OVERRIDES.get(
+        mood.lower(), (config.length_scale, config.noise_scale)
+    )
+    synthesis = piper.SynthesisConfig(
+        speaker_id=config.speaker_id,
+        length_scale=length_scale,
+        noise_scale=noise_scale,
+        noise_w_scale=config.noise_w,
+    )
+    sounddevice = importlib.import_module("sounddevice")
+    voice = _load_voice(model, config_path)
+    stream = None
+    try:
+        for chunk in voice.synthesize(text, syn_config=synthesis):
+            if stream is None:
+                stream = sounddevice.RawOutputStream(
+                    samplerate=chunk.sample_rate,
+                    channels=chunk.sample_channels,
+                    dtype="int16",
+                )
+                stream.start()
+            stream.write(chunk.audio_int16_bytes)
+    finally:
+        if stream is not None:
+            stream.stop()
+            stream.close()
+
+
+async def speak_piper(
+    config: VoiceProviderConfig, base_directory: Path, text: str, mood: str = ""
+) -> None:
+    await asyncio.to_thread(_synthesize, config, base_directory, text, mood)

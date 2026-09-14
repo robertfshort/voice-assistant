@@ -1,8 +1,10 @@
 import asyncio
+from pathlib import Path
 
 from pytest import MonkeyPatch
 from pytestqt.qtbot import QtBot
 
+from voice_assistant.domain.models import VoiceConfig
 from voice_assistant.services.npc_generation import NpcExpansion
 from voice_assistant.storage.npc_creation import NpcDraft
 from voice_assistant.ui import npc_dialog as npc_dialog_module
@@ -69,20 +71,19 @@ def test_voice_gender_filter_populates_and_syncs(qtbot: QtBot) -> None:
 def test_voice_preview_uses_current_voice_mood_and_style(
     qtbot: QtBot, monkeypatch: MonkeyPatch
 ) -> None:
-    captured: dict[str, str] = {}
+    captured: dict[str, object] = {}
 
-    async def fake_preview(
-        api_key: str, voice: str, mood: str, speaking_style: str, *, text: str
+    async def fake_speak(
+        voice: object, text: str, *, base_directory: Path, api_key: str = ""
     ) -> None:
         captured.update(
-            api_key=api_key,
             voice=voice,
-            mood=mood,
-            speaking_style=speaking_style,
             text=text,
+            base_directory=base_directory,
+            api_key=api_key,
         )
 
-    monkeypatch.setattr(npc_dialog_module, "preview_voice", fake_preview)
+    monkeypatch.setattr(npc_dialog_module, "speak_text", fake_speak)
     dialog = NpcDialog()
     qtbot.addWidget(dialog)
     dialog.name_input.setText("Mara Vale")
@@ -93,13 +94,16 @@ def test_voice_preview_uses_current_voice_mood_and_style(
 
     asyncio.run(dialog._preview_voice("test-key"))
 
-    assert captured == {
-        "api_key": "test-key",
-        "voice": "Kore",
-        "mood": "warm",
-        "speaking_style": "measured",
-        "text": "Greetings. I am Mara Vale. This is how I will sound at the table.",
-    }
+    voice = captured["voice"]
+    assert isinstance(voice, VoiceConfig)
+    assert voice.preferred_provider == "gemini"
+    assert voice.style == "measured"
+    assert voice.providers["gemini"].voice == "Kore"
+    assert captured["api_key"] == "test-key"
+    assert captured["base_directory"] == Path(".")
+    assert captured["text"] == (
+        "[[warm]] Greetings. I am Mara Vale. This is how I will sound at the table."
+    )
     assert dialog.voice_preview_button.isEnabled()
     assert dialog.voice_preview_button.text() == "Test voice settings"
 

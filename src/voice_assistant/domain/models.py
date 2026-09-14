@@ -18,13 +18,20 @@ class Secret(BaseModel):
 class VoiceProviderConfig(BaseModel):
     model_config = ConfigDict(extra="allow", frozen=True)
 
-    voice: str
+    voice: str = ""
+    model: str = ""
+    config: str = ""
+    speaker_id: int | None = None
+    length_scale: float = 1.0
+    noise_scale: float = 0.667
+    noise_w: float = 0.8
 
 
 class VoiceConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     style: str = ""
+    preferred_provider: str = "gemini"
     providers: dict[str, VoiceProviderConfig] = Field(default_factory=dict)
 
 

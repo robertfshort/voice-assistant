@@ -81,29 +81,29 @@ Development should preserve that possibility without requiring the first release
 
 ### Provider-neutral and local TTS (Piper)
 
-- Add a `speech` provider setting with options such as `gemini-live`, `piper`, and `system` (`pyttsx3` / `espeak`).
-- Let each NPC store provider-specific voice configs in `voice.yaml` so the same NPC can have a `gemini` voice, a `piper` model, and a `system` voice.
-- Add a global default TTS provider in `AppSettings.providers` and let the NPC dialog choose the preferred provider per NPC.
-- Piper settings per voice:
-  - `model` path to the `.onnx` model.
-  - `config` path to the `.onnx.json` config.
-  - `speaker_id` for multi-speaker models.
-  - `length_scale`, `noise_scale`, `noise_w`, and `sentence_silence` synthesis parameters.
-  - `sample_rate` and `channels` so the audio pipeline can resample to the output device.
+Implemented in the first Piper pass:
+
+- Provider-neutral TTS dispatch for Gemini and Piper in voice previews and **Speak as NPC**.
+- Per-NPC preferred provider and simultaneous Gemini/Piper configs in portable `voice.yaml` files.
+- Cached local Piper models with streaming playback through `sounddevice`.
+- Piper model/config selection, multi-speaker ID, length scale, noise scale, and noise width in the NPC editor.
+- Provider-specific `[[whisper]]`, `[[nervously]]`, and `[[shout]]` synthesis overrides.
+
+Remaining provider work:
+
+- Add a global default TTS provider in `AppSettings.providers`; NPC-specific selection currently takes precedence.
+- Add a `system` provider (`pyttsx3` / `espeak`).
+- Additional Piper settings for sentence silence and explicit sample-rate/channel overrides.
 - Audio output settings:
   - Output device selection.
   - Resampling from the provider sample rate to the selected device rate.
   - Buffer size and latency for `sounddevice`.
-- Mood tag mapping per provider:
-  - Gemini: keep the prompt-based `mood` wording.
-  - Piper: map `[[whisper]]` / `[[nervously]]` / `[[shout]]` to `length_scale` and `noise_scale` overrides, or skip mood for unsupported providers.
-  - System TTS: ignore mood tags and speak the text.
+- System TTS should ignore unsupported mood tags and speak the text.
 - Provider fallback chain: if the selected provider fails (quota, missing model, no API key), try the next configured provider and record the fallback in the log.
 - Centralised voice/voices asset directory:
   - `voices/` for `.onnx` / `.json` Piper models and a `voices.yaml` registry that maps voice names to provider-specific files.
   - Let campaigns reference a voice by name instead of by absolute path, keeping campaigns portable.
-- TTS preview should be provider-aware: play a test sample from the selected NPC and provider.
-- Conversation TTS should also use the configured provider, with the same voice fallback and resampling.
+- Add the same provider fallback and resampling behavior to every future conversation TTS path.
 
 ### Spell check
 
