@@ -50,6 +50,11 @@ def test_create_npc_dialog_result_reloads_and_selects_character(
             return draft
 
     monkeypatch.setattr(main_window_module, "NpcDialog", AcceptedNpcDialog)
+    monkeypatch.setattr(
+        main_window_module.QMessageBox,
+        "question",
+        lambda *a, **k: main_window_module.QMessageBox.StandardButton.No,
+    )
     window = MainWindow(campaign_root)
     qtbot.addWidget(window)
     initial_count = window._npc_list.count()

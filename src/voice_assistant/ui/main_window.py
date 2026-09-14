@@ -643,6 +643,7 @@ class MainWindow(QMainWindow):
             index for index, npc in enumerate(updated_campaign.npcs) if npc.id == draft.id
         )
         self._npc_list.setCurrentRow(new_row)
+        self._maybe_offer_public_lore()
         self.statusBar().showMessage(f"Created NPC: {draft.name}")
 
     def _edit_npc(self) -> None:
@@ -668,7 +669,22 @@ class MainWindow(QMainWindow):
         self._select_campaign(campaign_index)
         row = next(index for index, npc in enumerate(updated_campaign.npcs) if npc.id == npc_id)
         self._npc_list.setCurrentRow(row)
+        self._maybe_offer_public_lore()
         self.statusBar().showMessage(f"Updated NPC: {draft.name}")
+
+    def _maybe_offer_public_lore(self) -> None:
+        if self._active_npc is None:
+            return
+        if propose_npc_lore(self._active_npc) is None:
+            return
+        reply = QMessageBox.question(
+            self,
+            "Add public lore?",
+            "Public facts about this NPC can be added to campaign lore. Review the proposal?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            self._propose_npc_lore()
 
     def _duplicate_npc(self) -> None:
         if self._active_campaign is None or self._active_npc is None:
