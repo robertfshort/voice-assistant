@@ -62,7 +62,14 @@ Development should preserve that possibility without requiring the first release
 
 - Let the GM type text and have it spoken in a selected character's configured voice without running the NPC AI.
 - Support any campaign NPC or GM-defined voice so the GM can narrate, do side characters, or clarify in the same voice the players already heard.
+- Support in-text tags such as `[[whisper]]` or `[[nervously]]` to switch delivery style or mood for a section of the spoken line.
 - Keep the TTS control separate from the conversational AI response flow to avoid accidental model-generated replies.
+
+### Spell check
+
+- Provide spell checking for lore, NPC profiles, memories, and player text in the application.
+- Respect campaign-specific names, places, and terms so the GM can add words to a campaign dictionary and avoid false positives.
+- Keep the dictionary portable and editable alongside the campaign files.
 
 ## Near-term requirements
 
