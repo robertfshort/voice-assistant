@@ -9,6 +9,7 @@ from PySide6.QtWidgets import QApplication
 from qasync import QEventLoop
 
 from voice_assistant.storage.settings import (
+    AppearanceSettings,
     AppSettings,
     StorageSettings,
     load_settings,
@@ -16,6 +17,7 @@ from voice_assistant.storage.settings import (
     save_settings,
 )
 from voice_assistant.ui.main_window import MainWindow
+from voice_assistant.ui.themes import apply_theme
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -45,16 +47,27 @@ def main() -> int:
     application = QApplication(sys.argv)
     application.setApplicationName("RPG Voice Assistant")
     application.setOrganizationName("RobertShort")
-    window = MainWindow(campaign_root)
+    apply_theme(settings.appearance.theme, target=application)
+    window = MainWindow(campaign_root, theme=settings.appearance.theme)
 
     def save_campaign_root(path: Path) -> None:
         updated = AppSettings(
             storage=StorageSettings(campaign_root=path, portable_mode=False),
             providers=settings.providers,
+            appearance=settings.appearance,
+        )
+        save_settings(updated, arguments.config)
+
+    def save_theme(name: str) -> None:
+        updated = AppSettings(
+            storage=settings.storage,
+            providers=settings.providers,
+            appearance=AppearanceSettings(theme=name),
         )
         save_settings(updated, arguments.config)
 
     window.campaign_root_changed.connect(save_campaign_root)
+    window.theme_changed.connect(save_theme)
     window.show()
     event_loop = QEventLoop(application)
     asyncio.set_event_loop(event_loop)

@@ -5,6 +5,7 @@ import html
 from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QAction, QActionGroup
 from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -34,12 +35,14 @@ from voice_assistant.storage.npc_creation import create_npc, draft_from_npc, upd
 from voice_assistant.storage.npc_knowledge import append_npc_knowledge, save_npc_knowledge
 from voice_assistant.storage.transcripts import append_transcript, load_transcript
 from voice_assistant.ui.npc_dialog import NpcDialog
+from voice_assistant.ui.themes import THEME_NAMES, apply_theme
 
 
 class MainWindow(QMainWindow):
     campaign_root_changed = Signal(Path)
+    theme_changed = Signal(str)
 
-    def __init__(self, campaign_root: Path) -> None:
+    def __init__(self, campaign_root: Path, *, theme: str = "light") -> None:
         super().__init__()
         self._campaign_root = campaign_root
         self._campaigns: tuple[Campaign, ...] = ()
@@ -54,6 +57,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("RPG Voice Assistant")
         self.resize(1100, 720)
         self._build_ui()
+        self._build_theme_menu(theme)
         self.load_campaign_root(campaign_root)
 
     def _build_ui(self) -> None:
@@ -231,6 +235,26 @@ class MainWindow(QMainWindow):
         if self._campaigns:
             self._campaign_list.setCurrentRow(0)
         self.statusBar().showMessage(f"Loaded {len(self._campaigns)} campaign(s)")
+
+    def _build_theme_menu(self, theme: str) -> None:
+        menu_bar = self.menuBar()
+        settings_menu = menu_bar.addMenu("Settings")
+        theme_menu = settings_menu.addMenu("Theme")
+        group = QActionGroup(self)
+        group.setExclusive(True)
+        for name in THEME_NAMES:
+            action = QAction(name.capitalize(), self)
+            action.setCheckable(True)
+            action.setData(name)
+            action.setChecked(name == theme)
+            theme_menu.addAction(action)
+            group.addAction(action)
+        group.triggered.connect(self._on_theme_changed)
+
+    def _on_theme_changed(self, action: QAction) -> None:
+        name = str(action.data())
+        apply_theme(name)
+        self.theme_changed.emit(name)
 
     def _choose_campaign_root(self) -> None:
         selected = QFileDialog.getExistingDirectory(

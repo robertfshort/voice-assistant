@@ -25,11 +25,18 @@ class ProviderSettings(BaseModel):
     speech: str = "gemini-live"
 
 
+class AppearanceSettings(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    theme: str = "light"
+
+
 class AppSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     storage: StorageSettings = Field(default_factory=StorageSettings)
     providers: ProviderSettings = Field(default_factory=ProviderSettings)
+    appearance: AppearanceSettings = Field(default_factory=AppearanceSettings)
 
 
 def default_settings_path() -> Path:
