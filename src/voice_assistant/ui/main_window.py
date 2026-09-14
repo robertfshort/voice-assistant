@@ -206,9 +206,13 @@ class MainWindow(QMainWindow):
         self._append_knowledge_button = QPushButton("Append knowledge")
         self._append_knowledge_button.setEnabled(False)
         self._append_knowledge_button.clicked.connect(self._append_npc_knowledge)
+        self._spell_check_knowledge_button = QPushButton("Spell check")
+        self._spell_check_knowledge_button.setEnabled(False)
+        self._spell_check_knowledge_button.clicked.connect(self._spell_check_knowledge)
         knowledge_controls.addStretch()
         knowledge_controls.addWidget(self._save_knowledge_button)
         knowledge_controls.addWidget(self._append_knowledge_button)
+        knowledge_controls.addWidget(self._spell_check_knowledge_button)
         knowledge_layout.addLayout(knowledge_controls)
         tabs.addTab(knowledge, "NPC knowledge")
 
@@ -286,9 +290,13 @@ class MainWindow(QMainWindow):
         self._save_speaker_button = QPushButton("Save speaker")
         self._save_speaker_button.setEnabled(False)
         self._save_speaker_button.clicked.connect(self._save_speaker)
+        self._spell_check_speaker_button = QPushButton("Spell check")
+        self._spell_check_speaker_button.setEnabled(False)
+        self._spell_check_speaker_button.clicked.connect(self._spell_check_speaker)
         speaker_controls.addStretch()
         speaker_controls.addWidget(self._new_speaker_button)
         speaker_controls.addWidget(self._save_speaker_button)
+        speaker_controls.addWidget(self._spell_check_speaker_button)
         speakers_layout.addLayout(speaker_controls)
         tabs.addTab(speakers, "Speakers")
 
@@ -341,6 +349,7 @@ class MainWindow(QMainWindow):
         self._knowledge_append.setEnabled(False)
         self._save_knowledge_button.setEnabled(False)
         self._append_knowledge_button.setEnabled(False)
+        self._spell_check_knowledge_button.setEnabled(False)
         self._npc_heading.setText("No NPC selected")
         self._knowledge_heading.setText("No NPC selected")
         self._edit_npc_button.setEnabled(False)
@@ -401,6 +410,7 @@ class MainWindow(QMainWindow):
         self._speaker_editor.clear()
         self._speaker_editor.setEnabled(False)
         self._save_speaker_button.setEnabled(False)
+        self._spell_check_speaker_button.setEnabled(False)
         self._add_npc_button.setEnabled(self._active_campaign is not None)
         self._new_lore_button.setEnabled(self._active_campaign is not None)
         self._new_speaker_button.setEnabled(self._active_campaign is not None)
@@ -486,6 +496,7 @@ class MainWindow(QMainWindow):
         self._speaker_editor.setPlainText(self._active_speaker.profile)
         self._speaker_editor.setEnabled(True)
         self._save_speaker_button.setEnabled(True)
+        self._spell_check_speaker_button.setEnabled(True)
 
     def _create_speaker(self) -> None:
         if self._active_campaign is None:
@@ -761,6 +772,7 @@ class MainWindow(QMainWindow):
             self._knowledge_append.setEnabled(False)
             self._save_knowledge_button.setEnabled(False)
             self._append_knowledge_button.setEnabled(False)
+            self._spell_check_knowledge_button.setEnabled(False)
             self._start_button.setEnabled(False)
             self._inspect_button.setEnabled(False)
             self._session_notes_button.setEnabled(False)
@@ -775,6 +787,7 @@ class MainWindow(QMainWindow):
         self._knowledge_append.setEnabled(True)
         self._save_knowledge_button.setEnabled(True)
         self._append_knowledge_button.setEnabled(True)
+        self._spell_check_knowledge_button.setEnabled(True)
         self._load_active_transcript()
         self._start_button.setEnabled(True)
         self._inspect_button.setEnabled(True)
@@ -953,7 +966,21 @@ class MainWindow(QMainWindow):
     def _spell_check_lore(self) -> None:
         if self._active_campaign is None:
             return
-        text = self._lore_editor.toPlainText()
+        self._run_spell_check(self._lore_editor.toPlainText())
+
+    def _spell_check_knowledge(self) -> None:
+        if self._active_campaign is None:
+            return
+        self._run_spell_check(self._knowledge_editor.toPlainText())
+
+    def _spell_check_speaker(self) -> None:
+        if self._active_campaign is None:
+            return
+        self._run_spell_check(self._speaker_editor.toPlainText())
+
+    def _run_spell_check(self, text: str) -> None:
+        if self._active_campaign is None:
+            return
         checker = CampaignSpellCheck(self._active_campaign.dictionary)
         unknown = checker.unknown(text)
         if not unknown:
