@@ -51,6 +51,19 @@ Development should preserve that possibility without requiring the first release
 - Let the GM mark active player(s) before or during a session.
 - Include only the appropriate speaker context in the NPC prompt so the AI knows who it is addressing while honoring the same visibility boundaries as lore.
 
+### Play session transcription
+
+- Record full play sessions with speaker attribution for both players and NPCs.
+- Transcribe multiple microphones or a single table microphone and let the GM assign or correct speaker labels.
+- Store the timestamped transcript alongside the NPC conversation so later session summaries can distinguish player speech, GM instruction, and NPC replies.
+- Keep session transcription opt-in and expose visible recording controls with retention and export options.
+
+### GM-controlled character TTS
+
+- Let the GM type text and have it spoken in a selected character's configured voice without running the NPC AI.
+- Support any campaign NPC or GM-defined voice so the GM can narrate, do side characters, or clarify in the same voice the players already heard.
+- Keep the TTS control separate from the conversational AI response flow to avoid accidental model-generated replies.
+
 ## Near-term requirements
 
 ### Lore and NPC knowledge management
