@@ -5,8 +5,8 @@ import html
 from datetime import UTC, datetime
 from pathlib import Path
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QAction, QActionGroup
+from PySide6.QtCore import QPoint, Qt, Signal
+from PySide6.QtGui import QAction, QActionGroup, QTextCursor
 from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QListWidget,
     QMainWindow,
+    QMenu,
     QMessageBox,
     QPushButton,
     QSplitter,
@@ -128,6 +129,8 @@ class MainWindow(QMainWindow):
         conversation_layout.addWidget(QLabel("Conversation"))
         self._transcript = QTextEdit()
         self._transcript.setReadOnly(True)
+        self._transcript.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self._transcript.customContextMenuRequested.connect(self._show_transcript_menu)
         conversation_layout.addWidget(self._transcript, 2)
 
         input_form = QFormLayout()
@@ -920,6 +923,67 @@ class MainWindow(QMainWindow):
         )
         value = f"<i>{html.escape(text)}</i>" if private else html.escape(text)
         self._transcript.append(f"<b>{html.escape(label)}:</b> {value}")
+
+    def _show_transcript_menu(self, pos: QPoint) -> None:
+        menu = QMenu(self)
+        promote = menu.addAction("Promote to lore")
+        action = menu.exec(self._transcript.mapToGlobal(pos))
+        if action == promote:
+            self._promote_to_lore()
+
+    def _promote_to_lore(self) -> None:
+        if self._active_campaign is None:
+            return
+        cursor = self._transcript.textCursor()
+        snippet = cursor.selectedText()
+        if not snippet.strip():
+            cursor.select(QTextCursor.SelectionType.BlockUnderCursor)
+            snippet = cursor.selectedText()
+        snippet = snippet.replace("\u2029", "\n").strip()
+        if not snippet:
+            return
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Promote to lore")
+        layout = QVBoxLayout(dialog)
+        layout.addWidget(QLabel("Lore content"))
+        editor = QTextEdit()
+        editor.setPlainText(snippet)
+        layout.addWidget(editor, 3)
+        layout.addWidget(QLabel("Lore file name"))
+        name_input = QLineEdit()
+        stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
+        name_input.setText(f"curation-{stamp}.md")
+        layout.addWidget(name_input)
+        buttons = QHBoxLayout()
+        cancel = QPushButton("Cancel")
+        cancel.clicked.connect(dialog.reject)
+        create = QPushButton("Create lore")
+        create.clicked.connect(dialog.accept)
+        buttons.addStretch()
+        buttons.addWidget(cancel)
+        buttons.addWidget(create)
+        layout.addLayout(buttons)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        lore_id = name_input.text().strip().replace("\\", "/")
+        if not lore_id:
+            return
+        content = editor.toPlainText().strip()
+        if not content:
+            return
+        try:
+            create_lore(self._active_campaign.directory, lore_id, f"{content}\n")
+        except ValueError as exc:
+            QMessageBox.critical(self, "Lore creation error", str(exc))
+            return
+        updated_campaign = load_campaign(self._active_campaign.directory)
+        campaign_index = self._campaigns.index(self._active_campaign)
+        campaigns = list(self._campaigns)
+        campaigns[campaign_index] = updated_campaign
+        self._campaigns = tuple(campaigns)
+        self._select_campaign(campaign_index)
+        self._lore_list.setCurrentRow(sorted(updated_campaign.lore).index(lore_id))
+        self.statusBar().showMessage(f"Created lore: {lore_id}")
 
     def _save_transcript(self, speaker: str, text: str, *, private: bool = False) -> None:
         if self._active_campaign is None or self._active_npc is None:
