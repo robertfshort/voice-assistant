@@ -23,8 +23,9 @@ The early alpha build currently supports:
 - Structured lore records with visibility, scopes, provenance, and status
 - NPC prompt filtering for public/restricted lore; secret and GM-only lore is hidden
 - NPC affiliations stored in profiles and used to filter restricted lore by scope
+- Explainable knowledge resolution: Inspect context dialog shows why each lore record was included for an NPC
 
-The next roadmap step is **explainable knowledge resolution** (show the GM why each piece of lore was included for an NPC).
+The next roadmap step is **Milestone 5 — Session tools**: optional session transcription, session summaries, and proposed NPC memory/lore updates requiring GM approval.
 
 ## Product direction
 

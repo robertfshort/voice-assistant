@@ -2,8 +2,18 @@ from __future__ import annotations
 
 import hashlib
 import re
+from dataclasses import dataclass
 
 from voice_assistant.domain.models import Campaign, LoreRecord, Npc
+
+
+@dataclass(frozen=True)
+class LoreInclusion:
+    lore_id: str
+    title: str
+    visibility: str
+    reason: str
+
 
 _SAFE_ID = re.compile(r"[^a-z0-9-]+")
 _MAX_LORE_RECORDS = 20
@@ -13,21 +23,48 @@ def _npc_scope_keys(npc: Npc) -> set[str]:
     return {key.strip().lower() for key in (*npc.affiliations, npc.id)}
 
 
-def _lore_for_npc(records: dict[str, LoreRecord], npc: Npc) -> str:
+def _lore_inclusions(records: dict[str, LoreRecord], npc: Npc) -> list[LoreInclusion]:
     scope_keys = _npc_scope_keys(npc)
-    visible: list[LoreRecord] = []
+    inclusions: list[LoreInclusion] = []
     for record in records.values():
         if record.visibility == "public":
-            visible.append(record)
+            inclusions.append(
+                LoreInclusion(
+                    record.id,
+                    record.title,
+                    record.visibility,
+                    "Public knowledge available to all NPCs",
+                )
+            )
             continue
         if record.visibility == "restricted" and record.scopes:
             record_scopes = {scope.strip().lower() for scope in record.scopes}
-            if scope_keys & record_scopes:
-                visible.append(record)
-    if not visible:
+            matched = scope_keys & record_scopes
+            if matched:
+                inclusions.append(
+                    LoreInclusion(
+                        record.id,
+                        record.title,
+                        record.visibility,
+                        f"Restricted: matched scope(s) {', '.join(sorted(matched))}",
+                    )
+                )
+    inclusions.sort(key=lambda inclusion: inclusion.lore_id)
+    return inclusions
+
+
+def _lore_for_npc(records: dict[str, LoreRecord], npc: Npc) -> str:
+    inclusions = _lore_inclusions(records, npc)[:_MAX_LORE_RECORDS]
+    if not inclusions:
         return ""
-    limited = sorted(visible, key=lambda r: r.id)[:_MAX_LORE_RECORDS]
-    return "\n\n".join(f"## {record.title}\n{record.body.strip()}" for record in limited)
+    return "\n\n".join(
+        f"## {inclusion.title}\n{records[inclusion.lore_id].body.strip()}"
+        for inclusion in inclusions
+    )
+
+
+def explain_npc_lore(campaign: Campaign, npc: Npc) -> tuple[LoreInclusion, ...]:
+    return tuple(_lore_inclusions(campaign.lore_records, npc)[:_MAX_LORE_RECORDS])
 
 
 def room_id(campaign_id: str, npc_id: str) -> str:

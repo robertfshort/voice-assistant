@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
 )
 
 from voice_assistant.domain.models import Campaign, Npc
+from voice_assistant.services.conversation import explain_npc_lore
 from voice_assistant.services.voice_session import VoiceSessionController
 from voice_assistant.storage.campaigns import discover_campaigns, load_campaign
 from voice_assistant.storage.credentials import CredentialStore
@@ -149,11 +150,15 @@ class MainWindow(QMainWindow):
         player_button.clicked.connect(self._send_player_text)
         gm_button = QPushButton("Send private GM instruction")
         gm_button.clicked.connect(self._send_gm_text)
+        self._inspect_button = QPushButton("Inspect context")
+        self._inspect_button.setEnabled(False)
+        self._inspect_button.clicked.connect(self._inspect_npc_context)
         controls.addWidget(self._start_button)
         controls.addWidget(provider_button)
         controls.addStretch()
         controls.addWidget(player_button)
         controls.addWidget(gm_button)
+        controls.addWidget(self._inspect_button)
         conversation_layout.addLayout(controls)
         tabs.addTab(conversation, "NPC conversation")
 
@@ -502,6 +507,7 @@ class MainWindow(QMainWindow):
             self._save_knowledge_button.setEnabled(False)
             self._append_knowledge_button.setEnabled(False)
             self._start_button.setEnabled(False)
+            self._inspect_button.setEnabled(False)
             return
         self._npc_heading.setText(self._active_npc.name)
         self._knowledge_heading.setText(self._active_npc.name)
@@ -514,6 +520,7 @@ class MainWindow(QMainWindow):
         self._append_knowledge_button.setEnabled(True)
         self._load_active_transcript()
         self._start_button.setEnabled(True)
+        self._inspect_button.setEnabled(True)
 
     def _replace_active_npc_memory(self, memory: str) -> None:
         if self._active_campaign is None or self._active_npc is None:
@@ -720,6 +727,30 @@ class MainWindow(QMainWindow):
             asyncio.create_task(
                 self._voice_session.send_gm_instruction(text, request_response=request_response)
             )
+
+    def _inspect_npc_context(self) -> None:
+        if self._active_campaign is None or self._active_npc is None:
+            return
+        inclusions = explain_npc_lore(self._active_campaign, self._active_npc)
+        dialog = QDialog(self)
+        dialog.setWindowTitle(f"Context for {self._active_npc.name}")
+        layout = QVBoxLayout(dialog)
+        text = QTextEdit()
+        text.setReadOnly(True)
+        if inclusions:
+            lines = [
+                f"{inc.lore_id} — {inc.title} ({inc.visibility})\nReason: {inc.reason}"
+                for inc in inclusions
+            ]
+            text.setPlainText("\n\n".join(lines))
+        else:
+            text.setPlainText("No eligible campaign lore for this NPC.")
+        layout.addWidget(text)
+        close = QPushButton("Close")
+        close.clicked.connect(dialog.accept)
+        layout.addWidget(close)
+        dialog.resize(600, 400)
+        dialog.exec()
 
     def _configure_gemini_key(self) -> None:
         key, accepted = QInputDialog.getText(

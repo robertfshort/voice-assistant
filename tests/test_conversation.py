@@ -9,6 +9,7 @@ from voice_assistant.domain.models import (
 )
 from voice_assistant.services.conversation import (
     build_npc_prompt,
+    explain_npc_lore,
     private_gm_instruction,
     private_gm_request,
     room_id,
@@ -150,3 +151,25 @@ def test_private_gm_request_explicitly_requests_a_response() -> None:
 
     assert "Respond to the GM's request" in request
     assert "in-character player dialogue" in request
+
+
+def test_explain_npc_lore_shows_inclusion_reasons() -> None:
+    records = {
+        "public.md": LoreRecord(id="public.md", title="Public", body="Known."),
+        "restricted.md": LoreRecord(
+            id="restricted.md",
+            title="Restricted",
+            visibility="restricted",
+            scopes=("order-of-the-rose",),
+            body="Rumored.",
+        ),
+    }
+    campaign = _campaign_with_lore(records, affiliations=("order-of-the-rose",))
+
+    inclusions = explain_npc_lore(campaign, campaign.npc("npc"))
+
+    assert len(inclusions) == 2
+    assert inclusions[0].lore_id == "public.md"
+    assert inclusions[0].reason == "Public knowledge available to all NPCs"
+    assert inclusions[1].lore_id == "restricted.md"
+    assert "order-of-the-rose" in inclusions[1].reason
