@@ -18,8 +18,9 @@ from voice_assistant.domain.models import (
     VoiceConfig,
 )
 from voice_assistant.storage.dictionary import load_campaign_dictionary
+from voice_assistant.storage.lore import create_lore
 from voice_assistant.storage.npc_creation import NpcDraft, create_npc
-from voice_assistant.storage.speakers import load_speakers
+from voice_assistant.storage.speakers import create_speaker, load_speakers
 
 _CAMPAIGN_ID = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 _SECRET_HEADING = re.compile(r"^##\s+([a-z0-9][a-z0-9-]*)\s*$", re.MULTILINE)
@@ -316,4 +317,10 @@ def create_campaign(
         personality="Helpful and concise.",
     )
     create_npc(campaign_dir, draft)
+    create_lore(
+        campaign_dir,
+        "world.md",
+        f"---\nvisibility: public\n---\n\n# {name}\n\nWelcome to {name}.\n",
+    )
+    create_speaker(campaign_dir, "gm", "GM")
     return campaign_dir

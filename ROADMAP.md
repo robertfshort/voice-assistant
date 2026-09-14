@@ -15,7 +15,7 @@ The early alpha build currently supports:
   - Archive NPC (mark as archived in the create/edit dialog, shown in gray in the NPC list)
   - Change tracking and backups for lore, NPC, and profile edits
   - Propose public NPC facts into lore with GM review, and offer to do so automatically after creating or editing an NPC
-- Campaign management: Choose a campaigns folder, jump up one level, and create a new campaign with a default narrator NPC from the main window
+- Campaign management: Choose a campaigns folder, jump up one level, and create a new campaign with a default narrator NPC, world lore, and GM speaker from the main window
 - 30 Gemini TTS voices with Male/Female filter
 - Voice preview in the create/edit NPC dialog
 - NPC home region, current location, and relationships fields in the create/edit NPC dialog
