@@ -9,6 +9,21 @@ from roomkit.providers.gemini.config import GeminiConfig
 
 from voice_assistant.services.gemini_voices import GEMINI_VOICES
 
+_PROVIDERS: dict[tuple[str, int], GeminiAIProvider] = {}
+
+
+def _provider(api_key: str, max_tokens: int) -> GeminiAIProvider:
+    key = (api_key, max_tokens)
+    if key not in _PROVIDERS:
+        _PROVIDERS[key] = GeminiAIProvider(
+            GeminiConfig(
+                api_key=SecretStr(api_key),
+                model="gemini-3.1-flash-lite",
+                max_tokens=max_tokens,
+            )
+        )
+    return _PROVIDERS[key]
+
 
 class NpcExpansion(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -36,9 +51,7 @@ def _json_body(text: str) -> str:
 
 
 async def expand_npc(api_key: str, existing: dict[str, str]) -> NpcExpansion:
-    provider = GeminiAIProvider(
-        GeminiConfig(api_key=SecretStr(api_key), model="gemini-3.1-flash-lite", max_tokens=1400)
-    )
+    provider = _provider(api_key, 1400)
     prompt = (
         "Expand this tabletop RPG NPC draft. Preserve useful GM-authored details and fill empty "
         "fields. Choose a coherent character name first, then use that identity consistently. "
@@ -47,21 +60,18 @@ async def expand_npc(api_key: str, existing: dict[str, str]) -> NpcExpansion:
         "speaking_style. Draft: "
         f"{json.dumps(existing, ensure_ascii=False)}"
     )
-    try:
-        response = await provider.generate(
-            AIContext(
-                system_prompt=(
-                    "You help a game master draft concise, internally consistent campaign NPCs. "
-                    "Do not include secrets in public knowledge. Output valid JSON only."
-                ),
-                messages=[AIMessage(role="user", content=prompt)],
-                temperature=0.8,
-                max_tokens=1400,
-            )
+    response = await provider.generate(
+        AIContext(
+            system_prompt=(
+                "You help a game master draft concise, internally consistent campaign NPCs. "
+                "Do not include secrets in public knowledge. Output valid JSON only."
+            ),
+            messages=[AIMessage(role="user", content=prompt)],
+            temperature=0.8,
+            max_tokens=1400,
         )
-        return NpcExpansion.model_validate_json(_json_body(response.content))
-    finally:
-        await provider.close()
+    )
+    return NpcExpansion.model_validate_json(_json_body(response.content))
 
 
 async def generate_npc_field(
@@ -99,20 +109,15 @@ async def generate_npc_field(
         f"{public_rule} Return only the field value with no label or Markdown fence. "
         f"Current value: {current!r}. Other fields: {json.dumps(existing, ensure_ascii=False)}"
     )
-    provider = GeminiAIProvider(
-        GeminiConfig(api_key=SecretStr(api_key), model="gemini-3.1-flash-lite", max_tokens=700)
-    )
-    try:
-        response = await provider.generate(
-            AIContext(
-                system_prompt=(
-                    "You help a game master create concise, internally consistent campaign NPCs."
-                ),
-                messages=[AIMessage(role="user", content=prompt)],
-                temperature=0.8,
-                max_tokens=700,
-            )
+    provider = _provider(api_key, 700)
+    response = await provider.generate(
+        AIContext(
+            system_prompt=(
+                "You help a game master create concise, internally consistent campaign NPCs."
+            ),
+            messages=[AIMessage(role="user", content=prompt)],
+            temperature=0.8,
+            max_tokens=700,
         )
-        return response.content.strip()
-    finally:
-        await provider.close()
+    )
+    return response.content.strip()

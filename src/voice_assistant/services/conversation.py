@@ -6,6 +6,7 @@ import re
 from voice_assistant.domain.models import Campaign, LoreRecord, Npc
 
 _SAFE_ID = re.compile(r"[^a-z0-9-]+")
+_MAX_LORE_RECORDS = 20
 
 
 def _npc_scope_keys(npc: Npc) -> set[str]:
@@ -25,10 +26,8 @@ def _lore_for_npc(records: dict[str, LoreRecord], npc: Npc) -> str:
                 visible.append(record)
     if not visible:
         return ""
-    return "\n\n".join(
-        f"## {record.title}\n{record.body.strip()}"
-        for record in sorted(visible, key=lambda r: r.id)
-    )
+    limited = sorted(visible, key=lambda r: r.id)[:_MAX_LORE_RECORDS]
+    return "\n\n".join(f"## {record.title}\n{record.body.strip()}" for record in limited)
 
 
 def room_id(campaign_id: str, npc_id: str) -> str:

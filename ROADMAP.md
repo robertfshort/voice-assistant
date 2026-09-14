@@ -16,6 +16,9 @@ The early alpha build currently supports:
   - Propose public NPC facts into lore with GM review
 - 30 Gemini TTS voices with Male/Female filter
 - Voice preview in the create/edit NPC dialog
+- Cached Gemini clients for voice previews and NPC generation
+- Debounced AI generation and capped prompt lore records
+- Live session reconfigure for private GM instructions instead of full reconnect
 - UI theming: light, dark, dungeon, and tavern
 - Structured lore records with visibility, scopes, provenance, and status
 - NPC prompt filtering for public/restricted lore; secret and GM-only lore is hidden

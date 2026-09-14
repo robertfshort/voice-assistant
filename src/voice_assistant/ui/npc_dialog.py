@@ -42,6 +42,8 @@ class NpcDialog(QDialog):
     ) -> None:
         super().__init__(parent)
         self._credentials = credentials or CredentialStore()
+        self._pending_generations: dict[str, asyncio.Task[None]] = {}
+        self._pending_expansion: asyncio.Task[None] | None = None
         self.setWindowTitle("Create NPC")
         self.resize(620, 760)
         layout = QVBoxLayout(self)
@@ -263,9 +265,13 @@ class NpcDialog(QDialog):
         button.setEnabled(False)
         original_label = button.text()
         button.setText("Generating…")
-        asyncio.create_task(
+        existing = self._pending_generations.get(field)
+        if existing is not None and not existing.done():
+            existing.cancel()
+        task = asyncio.create_task(
             self._generate_field(api_key, field, button, original_label, flesh_out=flesh_out)
         )
+        self._pending_generations[field] = task
 
     async def _generate_field(
         self,
@@ -286,6 +292,7 @@ class NpcDialog(QDialog):
         finally:
             button.setEnabled(True)
             button.setText(original_label)
+            self._pending_generations.pop(field, None)
 
     def _set_field(self, field: str, value: str) -> None:
         text_fields = {
@@ -330,7 +337,9 @@ class NpcDialog(QDialog):
             return
         self.ai_expand_button.setEnabled(False)
         self.ai_expand_button.setText("Generating…")
-        asyncio.create_task(self._expand_with_ai(api_key))
+        if self._pending_expansion is not None and not self._pending_expansion.done():
+            self._pending_expansion.cancel()
+        self._pending_expansion = asyncio.create_task(self._expand_with_ai(api_key))
 
     async def _expand_with_ai(self, api_key: str) -> None:
         try:
@@ -356,6 +365,7 @@ class NpcDialog(QDialog):
         finally:
             self.ai_expand_button.setEnabled(True)
             self.ai_expand_button.setText("Generate this NPC with AI")
+            self._pending_expansion = None
 
     def _apply_expansion(self, expansion: NpcExpansion) -> None:
         self.name_input.setText(expansion.name)
