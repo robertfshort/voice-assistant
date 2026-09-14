@@ -33,6 +33,11 @@ from voice_assistant.storage.credentials import CredentialStore
 from voice_assistant.storage.lore import create_lore, save_lore
 from voice_assistant.storage.npc_creation import create_npc, draft_from_npc, update_npc
 from voice_assistant.storage.npc_knowledge import append_npc_knowledge, save_npc_knowledge
+from voice_assistant.storage.npc_lore_proposals import (
+    propose_npc_lore,
+    render_lore_file,
+    save_lore_proposal,
+)
 from voice_assistant.storage.transcripts import append_transcript, load_transcript
 from voice_assistant.ui.npc_dialog import NpcDialog
 from voice_assistant.ui.themes import THEME_NAMES, apply_theme
@@ -97,6 +102,10 @@ class MainWindow(QMainWindow):
         self._duplicate_npc_button.setEnabled(False)
         self._duplicate_npc_button.clicked.connect(self._duplicate_npc)
         selection_layout.addWidget(self._duplicate_npc_button)
+        self._propose_lore_button = QPushButton("Propose public lore")
+        self._propose_lore_button.setEnabled(False)
+        self._propose_lore_button.clicked.connect(self._propose_npc_lore)
+        selection_layout.addWidget(self._propose_lore_button)
         splitter.addWidget(selection)
 
         tabs = QTabWidget()
@@ -391,6 +400,85 @@ class MainWindow(QMainWindow):
         self._npc_list.setCurrentRow(new_row)
         self.statusBar().showMessage(f"Duplicated NPC: {draft.name}")
 
+    def _propose_npc_lore(self) -> None:
+        if self._active_campaign is None or self._active_npc is None:
+            return
+        proposed = propose_npc_lore(self._active_npc)
+        if proposed is None:
+            QMessageBox.information(
+                self, "Propose public lore", "No public facts found in the NPC profile."
+            )
+            return
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Review proposed public lore")
+        layout = QVBoxLayout(dialog)
+        layout.addWidget(QLabel("Content"))
+        editor = QTextEdit()
+        editor.setPlainText(render_lore_file(proposed))
+        editor.setMinimumHeight(300)
+        layout.addWidget(editor)
+        layout.addWidget(QLabel("Lore file"))
+        target_input = QLineEdit(proposed.id)
+        layout.addWidget(target_input)
+        buttons = QHBoxLayout()
+        cancel = QPushButton("Cancel")
+        cancel.clicked.connect(dialog.reject)
+        save = QPushButton("Save as new lore")
+        save.clicked.connect(dialog.accept)
+        save.setDefault(True)
+        buttons.addStretch()
+        buttons.addWidget(cancel)
+        buttons.addWidget(save)
+        layout.addLayout(buttons)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        lore_id = target_input.text().strip()
+        content = editor.toPlainText()
+        if not lore_id:
+            return
+        try:
+            save_lore_proposal(
+                self._active_campaign.directory,
+                lore_id,
+                content,
+                reason=f"Proposed from {self._active_npc.name}",
+            )
+        except ValueError:
+            reply = QMessageBox.question(
+                self,
+                "Lore file exists",
+                "A lore file with that name already exists. Overwrite with this proposal?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                return
+            try:
+                save_lore(
+                    self._active_campaign.directory,
+                    lore_id,
+                    content,
+                    reason=f"Proposed from {self._active_npc.name}",
+                )
+            except ValueError as exc:
+                QMessageBox.critical(self, "Lore save error", str(exc))
+                return
+        updated_campaign = load_campaign(self._active_campaign.directory)
+        campaign_index = self._campaigns.index(self._active_campaign)
+        campaigns = list(self._campaigns)
+        campaigns[campaign_index] = updated_campaign
+        self._campaigns = tuple(campaigns)
+        self._select_campaign(campaign_index)
+        npc_row = next(
+            index
+            for index, npc in enumerate(updated_campaign.npcs)
+            if npc.id == self._active_npc.id
+        )
+        self._npc_list.setCurrentRow(npc_row)
+        sorted_lore = sorted(updated_campaign.lore)
+        if lore_id in sorted_lore:
+            self._lore_list.setCurrentRow(sorted_lore.index(lore_id))
+        self.statusBar().showMessage(f"Proposed lore: {lore_id}")
+
     def _select_npc(self, row: int) -> None:
         if self._voice_session.active:
             self._player_input.setEnabled(False)
@@ -402,6 +490,7 @@ class MainWindow(QMainWindow):
             self._active_npc = self._active_campaign.npcs[row]
         self._edit_npc_button.setEnabled(self._active_npc is not None)
         self._duplicate_npc_button.setEnabled(self._active_npc is not None)
+        self._propose_lore_button.setEnabled(self._active_npc is not None)
         if self._active_npc is None:
             self._npc_heading.setText("No NPC selected")
             self._knowledge_heading.setText("No NPC selected")

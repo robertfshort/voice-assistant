@@ -13,13 +13,14 @@ The early alpha build currently supports:
   - Create and edit NPCs
   - Duplicate NPC as a starting template
   - Change tracking and backups for lore, NPC, and profile edits
+  - Propose public NPC facts into lore with GM review
 - 30 Gemini TTS voices with Male/Female filter
 - Voice preview in the create/edit NPC dialog
 - UI theming: light, dark, dungeon, and tavern
 - Structured lore records with visibility, scopes, provenance, and status
 - NPC prompt filtering for public/restricted lore; secret and GM-only lore is hidden
 
-The next roadmap step is **public NPC fact proposals into lore with GM review**.
+The next roadmap step is **NPC affiliations and organization-based lore scope filtering**.
 
 ## Product direction
 
