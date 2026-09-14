@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import importlib
+import re
 
 from google import genai
 from google.genai import types
@@ -57,3 +58,20 @@ async def preview_voice(
         ),
     )
     await asyncio.to_thread(_play_pcm, _audio_bytes(response))
+
+
+_TTS_TAG = re.compile(r"\[\[(.*?)\]\]")
+_RESET_MOODS = {"", "normal", "default", "reset"}
+
+
+def tts_segments(text: str) -> list[tuple[str, str]]:
+    segments: list[tuple[str, str]] = []
+    current_mood = ""
+    for index, part in enumerate(_TTS_TAG.split(text)):
+        if index % 2 == 1:
+            mood = part.strip().lower()
+            current_mood = "" if mood in _RESET_MOODS or mood.startswith("/") else mood
+            continue
+        if part.strip():
+            segments.append((current_mood, part.strip()))
+    return segments

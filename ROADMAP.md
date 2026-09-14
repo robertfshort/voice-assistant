@@ -28,8 +28,9 @@ The early alpha build currently supports:
 - Proposed lore from sessions: Review and edit AI-proposed public facts from a session transcript and create new lore files with GM approval
 - PC/speaker profiles: A `pcs/` directory for player and named speaker profiles, an editable speaker list, and active speaker context fed into the NPC prompt
 - GM-controlled character TTS: A "Speak as NPC" button that lets the GM type text and speak it through the active NPC's configured Gemini voice without running the conversational AI
+- TTS mood tags: `[[whisper]]`, `[[nervously]]`, `[[/mood]]`, and similar tags in the typed line switch the TTS delivery for the following segment
 
-The next roadmap step is the next feature from the **## Future feature notes** section, likely one of play session transcription with speaker attribution, TTS mood tags, or in-app spell check.
+The next roadmap step is the next feature from the **## Future feature notes** section, likely one of play session transcription with speaker attribution or in-app spell check.
 
 ## Product direction
 

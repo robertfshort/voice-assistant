@@ -30,7 +30,7 @@ from PySide6.QtWidgets import (
 from voice_assistant.domain.models import Campaign, Npc, SpeakerProfile
 from voice_assistant.services.conversation import explain_npc_lore
 from voice_assistant.services.session_notes import SessionNotes, propose_session_notes
-from voice_assistant.services.voice_preview import preview_voice
+from voice_assistant.services.voice_preview import preview_voice, tts_segments
 from voice_assistant.services.voice_session import VoiceSessionController
 from voice_assistant.storage.campaigns import discover_campaigns, load_campaign
 from voice_assistant.storage.credentials import CredentialStore
@@ -930,13 +930,9 @@ class MainWindow(QMainWindow):
         try:
             if self._active_npc is None:
                 return
-            await preview_voice(
-                api_key,
-                voice,
-                "",
-                self._active_npc.voice.style,
-                text=text,
-            )
+            style = self._active_npc.voice.style
+            for mood, segment in tts_segments(text):
+                await preview_voice(api_key, voice, mood, style, text=segment)
         except Exception as exc:
             QMessageBox.critical(self, "TTS error", str(exc))
         finally:
