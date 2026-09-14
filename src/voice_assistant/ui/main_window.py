@@ -220,6 +220,26 @@ class MainWindow(QMainWindow):
         self._lore_editor.setPlaceholderText("Select a lore file to view or edit it")
         self._lore_editor.setEnabled(False)
         lore_layout.addWidget(self._lore_editor, 3)
+        lore_metadata = QHBoxLayout()
+        lore_metadata.addWidget(QLabel("Insert"))
+        for label, snippet in [
+            ("Public", "---\nvisibility: public\n---\n\n"),
+            ("Restricted", "---\nvisibility: restricted\nscopes:\n  - \n---\n\n"),
+            ("Secret", "---\nvisibility: secret\n---\n\n"),
+            ("GM-only", "---\nvisibility: gm-only\n---\n\n"),
+            ("Proposed", "---\nstatus: proposed\n---\n\n"),
+        ]:
+            button = QPushButton(label)
+            button.clicked.connect(lambda _=False, text=snippet: self._insert_lore_snippet(text))
+            lore_metadata.addWidget(button)
+        self._lore_scope_input = QLineEdit()
+        self._lore_scope_input.setPlaceholderText("order-of-the-rose")
+        lore_scope_button = QPushButton("Group scope")
+        lore_scope_button.clicked.connect(lambda _: self._insert_lore_scope())
+        lore_metadata.addWidget(self._lore_scope_input)
+        lore_metadata.addWidget(lore_scope_button)
+        lore_metadata.addStretch()
+        lore_layout.addLayout(lore_metadata)
         lore_controls = QHBoxLayout()
         self._new_lore_button = QPushButton("Create lore entry")
         self._new_lore_button.setEnabled(False)
@@ -903,6 +923,22 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage("Lore saved; voice session stopped to reload context")
         else:
             self.statusBar().showMessage(f"Saved lore: {self._active_lore_id}")
+
+    def _insert_lore_snippet(self, snippet: str) -> None:
+        if not self._lore_editor.isEnabled():
+            return
+        self._lore_editor.textCursor().insertText(snippet)
+        self._lore_editor.setFocus()
+
+    def _insert_lore_scope(self) -> None:
+        if not self._lore_editor.isEnabled():
+            return
+        scope = self._lore_scope_input.text().strip()
+        if not scope:
+            return
+        self._lore_editor.textCursor().insertText(f"<!-- scope: {scope} -->\n")
+        self._lore_scope_input.clear()
+        self._lore_editor.setFocus()
 
     def _load_active_transcript(self) -> None:
         self._transcript.clear()
