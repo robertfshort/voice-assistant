@@ -5,6 +5,7 @@ import pytest
 from voice_assistant.domain.errors import CampaignError
 from voice_assistant.services.conversation import build_npc_prompt
 from voice_assistant.storage.campaigns import (
+    create_campaign,
     discover_campaigns,
     load_campaign,
     parse_secrets,
@@ -118,3 +119,13 @@ def test_lore_front_matter_is_parsed_and_filters_prompts(tmp_path: Path) -> None
     assert campaign.lore_records["public.md"].title == "Public"
     assert "Secret body." not in build_npc_prompt(campaign, campaign.npc("npc"))
     assert "Public body." in build_npc_prompt(campaign, campaign.npc("npc"))
+
+
+def test_create_campaign_builds_a_loadable_campaign(tmp_path: Path) -> None:
+    create_campaign(tmp_path, "new-campaign", "New Campaign")
+
+    campaigns = discover_campaigns(tmp_path)
+    assert len(campaigns) == 1
+    assert campaigns[0].manifest.id == "new-campaign"
+    assert campaigns[0].manifest.name == "New Campaign"
+    assert campaigns[0].npc("narrator").name == "Narrator"

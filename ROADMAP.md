@@ -14,6 +14,7 @@ The early alpha build currently supports:
   - Duplicate NPC as a starting template
   - Change tracking and backups for lore, NPC, and profile edits
   - Propose public NPC facts into lore with GM review
+- Campaign management: Choose a campaigns folder, jump up one level, and create a new campaign with a default narrator NPC from the main window
 - 30 Gemini TTS voices with Male/Female filter
 - Voice preview in the create/edit NPC dialog
 - Cached Gemini clients for voice previews and NPC generation

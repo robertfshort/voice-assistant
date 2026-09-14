@@ -18,8 +18,10 @@ from voice_assistant.domain.models import (
     VoiceConfig,
 )
 from voice_assistant.storage.dictionary import load_campaign_dictionary
+from voice_assistant.storage.npc_creation import NpcDraft, create_npc
 from voice_assistant.storage.speakers import load_speakers
 
+_CAMPAIGN_ID = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 _SECRET_HEADING = re.compile(r"^##\s+([a-z0-9][a-z0-9-]*)\s*$", re.MULTILINE)
 _SECRET_METADATA = re.compile(r"^(hint|mode|revealed):\s*(.*)$")
 _PROFILE_HEADING = re.compile(r"^#\s+(.+?)\s*$", re.MULTILINE)
@@ -264,3 +266,50 @@ def discover_campaigns(root: Path) -> tuple[Campaign, ...]:
         if (directory / "campaign.yaml").exists():
             campaigns.append(load_campaign(directory))
     return tuple(campaigns)
+
+
+def create_campaign(
+    root: Path,
+    campaign_id: str,
+    name: str,
+    *,
+    description: str = "",
+    default_npc_id: str = "narrator",
+    default_npc_name: str = "Narrator",
+) -> Path:
+    if not _CAMPAIGN_ID.fullmatch(campaign_id):
+        raise CampaignError(
+            "Campaign ID must use lowercase letters, numbers, and hyphens, "
+            "and start with a letter or number"
+        )
+    root = root.expanduser().resolve()
+    campaign_dir = root / campaign_id
+    if campaign_dir.exists():
+        raise CampaignError(f"Campaign already exists: {campaign_id}")
+    (campaign_dir / "characters").mkdir(parents=True)
+    (campaign_dir / "lore").mkdir()
+    (campaign_dir / "pcs").mkdir()
+    (campaign_dir / "sessions").mkdir()
+    (campaign_dir / "scripts").mkdir()
+    (campaign_dir / "backups").mkdir()
+    (campaign_dir / "campaign.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "id": campaign_id,
+                "name": name,
+                "description": description,
+                "default_npc": default_npc_id,
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+        newline="\n",
+    )
+    draft = NpcDraft(
+        id=default_npc_id,
+        name=default_npc_name,
+        role="Narrator and guide for the campaign.",
+        personality="Helpful and concise.",
+    )
+    create_npc(campaign_dir, draft)
+    return campaign_dir

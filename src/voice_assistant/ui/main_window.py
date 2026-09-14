@@ -34,7 +34,7 @@ from voice_assistant.services.session_notes import SessionNotes, propose_session
 from voice_assistant.services.spell_check import CampaignSpellCheck
 from voice_assistant.services.voice_preview import preview_voice, tts_segments
 from voice_assistant.services.voice_session import VoiceSessionController
-from voice_assistant.storage.campaigns import discover_campaigns, load_campaign
+from voice_assistant.storage.campaigns import create_campaign, discover_campaigns, load_campaign
 from voice_assistant.storage.credentials import CredentialStore
 from voice_assistant.storage.lore import create_lore, save_lore
 from voice_assistant.storage.npc_creation import create_npc, draft_from_npc, update_npc
@@ -84,8 +84,14 @@ class MainWindow(QMainWindow):
         self._campaign_path.setReadOnly(True)
         choose_button = QPushButton("Choose campaign folder")
         choose_button.clicked.connect(self._choose_campaign_root)
-        path_row.addWidget(QLabel("Campaign root"))
+        up_button = QPushButton("Up one level")
+        up_button.clicked.connect(self._move_campaign_root_up)
+        new_campaign_button = QPushButton("New campaign")
+        new_campaign_button.clicked.connect(self._new_campaign)
+        path_row.addWidget(QLabel("Campaigns folder"))
         path_row.addWidget(self._campaign_path, 1)
+        path_row.addWidget(up_button)
+        path_row.addWidget(new_campaign_button)
         path_row.addWidget(choose_button)
         layout.addLayout(path_row)
 
@@ -383,13 +389,51 @@ class MainWindow(QMainWindow):
     def _choose_campaign_root(self) -> None:
         selected = QFileDialog.getExistingDirectory(
             self,
-            "Choose campaign root",
+            "Choose campaigns folder",
             str(self._campaign_root),
         )
         if selected:
             path = Path(selected)
             self.load_campaign_root(path)
             self.campaign_root_changed.emit(path)
+
+    def _move_campaign_root_up(self) -> None:
+        parent = self._campaign_root.parent
+        if parent == self._campaign_root:
+            return
+        self.load_campaign_root(parent)
+        self.campaign_root_changed.emit(parent)
+
+    def _new_campaign(self) -> None:
+        campaign_id, accepted = QInputDialog.getText(
+            self,
+            "New campaign",
+            "Campaign folder ID (lowercase with hyphens):",
+            text="my-campaign",
+        )
+        if not accepted or not campaign_id.strip():
+            return
+        campaign_id = campaign_id.strip().lower()
+        name, accepted = QInputDialog.getText(
+            self,
+            "New campaign",
+            "Campaign name:",
+            text=campaign_id.replace("-", " ").title(),
+        )
+        if not accepted or not name.strip():
+            return
+        try:
+            create_campaign(self._campaign_root, campaign_id, name.strip())
+        except ValueError as exc:
+            QMessageBox.critical(self, "Campaign creation error", str(exc))
+            return
+        self.load_campaign_root(self._campaign_root)
+        row = next(
+            index
+            for index, campaign in enumerate(self._campaigns)
+            if campaign.manifest.id == campaign_id
+        )
+        self._campaign_list.setCurrentRow(row)
 
     def _select_campaign(self, row: int) -> None:
         self._active_campaign = self._campaigns[row] if 0 <= row < len(self._campaigns) else None
