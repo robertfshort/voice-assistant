@@ -227,6 +227,10 @@ class MainWindow(QMainWindow):
         lore = QWidget()
         lore_layout = QVBoxLayout(lore)
         lore_layout.addWidget(QLabel("Campaign lore"))
+        self._lore_filter = QLineEdit()
+        self._lore_filter.setPlaceholderText("Filter lore by title or content")
+        self._lore_filter.textChanged.connect(self._load_lore_list)
+        lore_layout.addWidget(self._lore_filter)
         self._lore_list = QListWidget()
         self._lore_list.currentRowChanged.connect(self._select_lore)
         lore_layout.addWidget(self._lore_list, 1)
@@ -477,10 +481,7 @@ class MainWindow(QMainWindow):
             if npc.archived:
                 item.setForeground(QColor("gray"))
             self._npc_list.addItem(item)
-        for lore_id in sorted(self._active_campaign.lore):
-            self._lore_list.addItem(lore_id)
-        if self._lore_list.count():
-            self._lore_list.setCurrentRow(0)
+        self._load_lore_list()
         for speaker in self._active_campaign.speakers:
             label = f"{speaker.name} (active)" if speaker.active else speaker.name
             self._speaker_list.addItem(label)
@@ -967,10 +968,8 @@ class MainWindow(QMainWindow):
         campaigns[campaign_index] = updated_campaign
         self._campaigns = tuple(campaigns)
         self._active_campaign = updated_campaign
-        self._lore_list.clear()
-        lore_ids = sorted(updated_lore)
-        self._lore_list.addItems(lore_ids)
-        self._lore_list.setCurrentRow(lore_ids.index(lore_id))
+        self._lore_filter.clear()
+        self._load_lore_list(select_id=lore_id)
         self._lore_editor.setFocus()
         if self._voice_session.active:
             asyncio.create_task(self._voice_session.stop())
@@ -984,8 +983,8 @@ class MainWindow(QMainWindow):
         if self._active_campaign is None:
             self._active_lore_id = None
         else:
-            lore_ids = sorted(self._active_campaign.lore)
-            self._active_lore_id = lore_ids[row] if 0 <= row < len(lore_ids) else None
+            item = self._lore_list.item(row)
+            self._active_lore_id = item.text() if item is not None else None
         if self._active_lore_id is None or self._active_campaign is None:
             self._lore_editor.clear()
             self._lore_editor.setEnabled(False)
@@ -995,6 +994,24 @@ class MainWindow(QMainWindow):
         self._lore_editor.setEnabled(True)
         self._save_lore_button.setEnabled(True)
         self._spell_check_button.setEnabled(True)
+
+    def _load_lore_list(self, select_id: str | None = None) -> None:
+        if self._active_campaign is None:
+            self._lore_list.clear()
+            return
+        query = self._lore_filter.text().lower().strip()
+        self._lore_list.clear()
+        for lore_id in sorted(self._active_campaign.lore):
+            text = self._active_campaign.lore[lore_id].lower()
+            if not query or query in lore_id.lower() or query in text:
+                self._lore_list.addItem(lore_id)
+        if select_id is not None:
+            for row in range(self._lore_list.count()):
+                if self._lore_list.item(row).text() == select_id:
+                    self._lore_list.setCurrentRow(row)
+                    return
+        if self._lore_list.count():
+            self._lore_list.setCurrentRow(0)
 
     def _save_lore(self) -> None:
         if self._active_campaign is None or self._active_lore_id is None:
@@ -1030,6 +1047,7 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage("Lore saved; voice session stopped to reload context")
         else:
             self.statusBar().showMessage(f"Saved lore: {self._active_lore_id}")
+        self._load_lore_list(select_id=self._active_lore_id)
 
     def _insert_lore_snippet(self, snippet: str) -> None:
         if not self._lore_editor.isEnabled():
@@ -1475,8 +1493,8 @@ class MainWindow(QMainWindow):
         campaigns[campaign_index] = updated_campaign
         self._campaigns = tuple(campaigns)
         self._select_campaign(campaign_index)
-        lore_ids = sorted(updated_campaign.lore)
-        self._lore_list.setCurrentRow(lore_ids.index(lore_id))
+        self._lore_filter.clear()
+        self._load_lore_list(select_id=lore_id)
         self._lore_editor.setFocus()
         if self._voice_session.active:
             asyncio.create_task(self._voice_session.stop())

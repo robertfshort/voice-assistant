@@ -17,6 +17,7 @@ The early alpha build currently supports:
   - Propose public NPC facts into lore with GM review, including visibility, scopes, editable body, and file target, and offer to do so automatically after creating or editing an NPC
 - Campaign management: Choose a campaigns folder, jump up one level, and create a new campaign with a default narrator NPC, world lore, and GM speaker from the main window
 - 30 Gemini TTS voices with Male/Female filter
+- Lore search/filter by title or content in the Lore tab
 - Voice preview in the create/edit NPC dialog
 - NPC home region, current location, and relationships fields in the create/edit NPC dialog
 - Cached Gemini clients for voice previews and NPC generation
