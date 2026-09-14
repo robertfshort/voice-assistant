@@ -5,7 +5,7 @@ from pytest import MonkeyPatch
 
 from voice_assistant.domain.models import VoiceConfig, VoiceProviderConfig
 from voice_assistant.services import text_to_speech
-from voice_assistant.services.audio_devices import output_device_value
+from voice_assistant.services.audio_devices import output_device_value, resample_pcm16
 from voice_assistant.services.piper_tts import resolve_voice_path
 
 
@@ -13,6 +13,14 @@ def test_output_device_value_supports_stable_device_indexes() -> None:
     assert output_device_value("") is None
     assert output_device_value("3") == 3
     assert output_device_value("Speakers") == "Speakers"
+
+
+def test_resample_pcm16_changes_frame_count_and_preserves_channels() -> None:
+    source = b"\x00\x00\xe8\x03\xd0\x07\xb8\x0b"
+
+    result = resample_pcm16(source, 2, 4, 2)
+
+    assert len(result) == 16
 
 
 def test_relative_piper_model_resolves_from_campaign_directory(tmp_path: Path) -> None:

@@ -134,6 +134,10 @@ class NpcDialog(QDialog):
         self.piper_noise_w_input.setRange(0.0, 2.0)
         self.piper_noise_w_input.setValue(0.8)
         self.piper_noise_w_input.setSingleStep(0.05)
+        self.piper_silence_input = QDoubleSpinBox()
+        self.piper_silence_input.setRange(0.0, 5.0)
+        self.piper_silence_input.setSingleStep(0.1)
+        self.piper_silence_input.setSuffix(" seconds")
 
         form.addRow("Name", self._field_with_ai(self.name_input, "name"))
         form.addRow("Stable ID", self.id_input)
@@ -170,6 +174,7 @@ class NpcDialog(QDialog):
         form.addRow("Piper length scale", self.piper_length_input)
         form.addRow("Piper noise scale", self.piper_noise_input)
         form.addRow("Piper noise width", self.piper_noise_w_input)
+        form.addRow("Piper sentence silence", self.piper_silence_input)
 
         self.portrait_input = QLineEdit()
         self.portrait_input.setReadOnly(True)
@@ -240,6 +245,7 @@ class NpcDialog(QDialog):
         self.piper_length_input.setValue(draft.piper_length_scale)
         self.piper_noise_input.setValue(draft.piper_noise_scale)
         self.piper_noise_w_input.setValue(draft.piper_noise_w)
+        self.piper_silence_input.setValue(draft.piper_sentence_silence)
         if draft.portrait:
             self.portrait_input.setText(draft.portrait)
             self._load_portrait_preview(draft.portrait)
@@ -389,6 +395,7 @@ class NpcDialog(QDialog):
                 length_scale=self.piper_length_input.value(),
                 noise_scale=self.piper_noise_input.value(),
                 noise_w=self.piper_noise_w_input.value(),
+                sentence_silence=self.piper_silence_input.value(),
             )
             voice = VoiceConfig(
                 style=self.style_input.currentText().strip(),
@@ -569,6 +576,7 @@ class NpcDialog(QDialog):
             piper_length_scale=self.piper_length_input.value(),
             piper_noise_scale=self.piper_noise_input.value(),
             piper_noise_w=self.piper_noise_w_input.value(),
+            piper_sentence_silence=self.piper_silence_input.value(),
             portrait=self.portrait_input.text().strip() or None,
             archived=self.archived_input.isChecked(),
         )

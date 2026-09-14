@@ -6,7 +6,11 @@ from pathlib import Path
 from typing import Any
 
 from voice_assistant.domain.models import VoiceProviderConfig
-from voice_assistant.services.audio_devices import output_device_value
+from voice_assistant.services.audio_devices import (
+    output_device_value,
+    output_sample_rate,
+    resample_pcm16,
+)
 from voice_assistant.storage.voices import resolve_registered_voice
 
 _VOICES: dict[tuple[Path, Path | None], Any] = {}
@@ -71,9 +75,12 @@ def _synthesize(
     stream = None
     try:
         for chunk in voice.synthesize(text, syn_config=synthesis):
+            target_rate = output_sample_rate(
+                output_device, chunk.sample_rate, chunk.sample_channels
+            )
             if stream is None:
                 stream = sounddevice.RawOutputStream(
-                    samplerate=chunk.sample_rate,
+                    samplerate=target_rate,
                     channels=chunk.sample_channels,
                     dtype="int16",
                     device=output_device_value(output_device),
@@ -81,7 +88,17 @@ def _synthesize(
                     blocksize=output_blocksize,
                 )
                 stream.start()
-            stream.write(chunk.audio_int16_bytes)
+            stream.write(
+                resample_pcm16(
+                    chunk.audio_int16_bytes,
+                    chunk.sample_rate,
+                    target_rate,
+                    chunk.sample_channels,
+                )
+            )
+            silence_frames = round(config.sentence_silence * target_rate)
+            if silence_frames > 0:
+                stream.write(bytes(silence_frames * chunk.sample_channels * 2))
     finally:
         if stream is not None:
             stream.stop()

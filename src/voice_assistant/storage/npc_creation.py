@@ -60,6 +60,7 @@ class NpcDraft(BaseModel):
     piper_length_scale: float = 1.0
     piper_noise_scale: float = 0.667
     piper_noise_w: float = 0.8
+    piper_sentence_silence: float = 0.0
     portrait: str | None = None
     archived: bool = False
     home: str = ""
@@ -122,6 +123,7 @@ def _voice(draft: NpcDraft, existing: dict[str, object] | None = None) -> dict[s
             "length_scale": draft.piper_length_scale,
             "noise_scale": draft.piper_noise_scale,
             "noise_w": draft.piper_noise_w,
+            "sentence_silence": draft.piper_sentence_silence,
         }
     else:
         providers.pop("piper", None)
@@ -207,6 +209,7 @@ def draft_from_npc(npc: Npc) -> NpcDraft:
         piper_length_scale=piper.length_scale if piper else 1.0,
         piper_noise_scale=piper.noise_scale if piper else 0.667,
         piper_noise_w=piper.noise_w if piper else 0.8,
+        piper_sentence_silence=piper.sentence_silence if piper else 0.0,
         portrait=(npc.directory / npc.portrait).as_posix() if npc.portrait else None,
         archived=sections.get("status", "").lower() == "archived",
         home=sections.get("home region", ""),

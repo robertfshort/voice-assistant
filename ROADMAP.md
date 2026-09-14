@@ -93,12 +93,13 @@ Implemented in the first Piper pass:
 - Ordered Piper/Gemini fallback with failures logged and surfaced if every configured provider fails.
 - Configurable `sounddevice` output device, latency, and block size for Piper playback.
 - Safe local model import that copies `.onnx`/`.json` assets into the shared voice folder and updates `voices.yaml`.
+- Automatic PCM resampling to a selected device's supported default rate when it rejects Piper's native rate.
+- Per-NPC sentence-silence control stored in portable `voice.yaml`.
 
 Remaining provider work:
 
 - Add a `system` provider (`pyttsx3` / `espeak`).
-- Additional Piper settings for sentence silence and explicit sample-rate/channel overrides.
-- Audio resampling when a selected output device cannot accept the Piper model's native sample rate.
+- Optional expert overrides for explicit output sample rate and channels.
 - System TTS should ignore unsupported mood tags and speak the text.
 - Voice model discovery/download UI with license, language, quality, size, and checksum metadata.
 - Add the same provider fallback and resampling behavior to every future conversation TTS path.
