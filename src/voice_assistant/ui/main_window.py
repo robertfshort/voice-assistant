@@ -60,6 +60,7 @@ class MainWindow(QMainWindow):
         self._active_npc: Npc | None = None
         self._active_speaker: SpeakerProfile | None = None
         self._active_lore_id: str | None = None
+        self._recording_session_id: str | None = None
         self._credentials = CredentialStore()
         self._voice_session = VoiceSessionController()
         self._voice_session.state_changed.connect(self._voice_state_changed)
@@ -164,6 +165,9 @@ class MainWindow(QMainWindow):
         self._speak_as_npc_button = QPushButton("Speak as NPC")
         self._speak_as_npc_button.setEnabled(False)
         self._speak_as_npc_button.clicked.connect(self._on_speak_as_npc)
+        self._record_button = QPushButton("Record session")
+        self._record_button.setEnabled(False)
+        self._record_button.clicked.connect(self._toggle_session_recording)
         controls.addWidget(self._start_button)
         controls.addWidget(provider_button)
         controls.addStretch()
@@ -172,6 +176,7 @@ class MainWindow(QMainWindow):
         controls.addWidget(self._inspect_button)
         controls.addWidget(self._session_notes_button)
         controls.addWidget(self._speak_as_npc_button)
+        controls.addWidget(self._record_button)
         conversation_layout.addLayout(controls)
         tabs.addTab(conversation, "NPC conversation")
 
@@ -257,6 +262,25 @@ class MainWindow(QMainWindow):
         speaker_controls.addWidget(self._save_speaker_button)
         speakers_layout.addLayout(speaker_controls)
         tabs.addTab(speakers, "Speakers")
+
+        session = QWidget()
+        session_layout = QVBoxLayout(session)
+        session_layout.addWidget(QLabel("Table sessions"))
+        self._session_list = QListWidget()
+        self._session_list.currentRowChanged.connect(self._select_session)
+        session_layout.addWidget(self._session_list, 1)
+        self._session_display = QTextEdit()
+        self._session_display.setReadOnly(True)
+        self._session_display.setPlaceholderText("Select a table session to view the transcript")
+        session_layout.addWidget(self._session_display, 3)
+        session_controls = QHBoxLayout()
+        self._stop_session_button = QPushButton("Stop recording")
+        self._stop_session_button.setEnabled(False)
+        self._stop_session_button.clicked.connect(self._toggle_session_recording)
+        session_controls.addWidget(self._stop_session_button)
+        session_controls.addStretch()
+        session_layout.addLayout(session_controls)
+        tabs.addTab(session, "Session")
 
         splitter.addWidget(tabs)
         splitter.setStretchFactor(1, 1)
@@ -348,6 +372,15 @@ class MainWindow(QMainWindow):
         self._add_npc_button.setEnabled(self._active_campaign is not None)
         self._new_lore_button.setEnabled(self._active_campaign is not None)
         self._new_speaker_button.setEnabled(self._active_campaign is not None)
+        self._record_button.setEnabled(self._active_campaign is not None)
+        self._stop_session_button.setEnabled(False)
+        if self._recording_session_id is not None:
+            self._recording_session_id = None
+            self._record_button.setText("Record session")
+        self._session_list.clear()
+        self._session_display.clear()
+        if self._active_campaign is not None:
+            self._load_session_list()
         if self._active_campaign is None:
             return
         for npc in self._active_campaign.npcs:
@@ -371,6 +404,36 @@ class MainWindow(QMainWindow):
             0,
         )
         self._npc_list.setCurrentRow(default_index)
+
+    def _load_session_list(self) -> None:
+        if self._active_campaign is None:
+            return
+        sessions = self._active_campaign.directory / "sessions"
+        if not sessions.exists():
+            return
+        files = sorted(
+            path
+            for path in sessions.iterdir()
+            if path.suffix == ".jsonl" and path.stem.startswith("table-")
+        )
+        for path in files:
+            self._session_list.addItem(path.stem)
+
+    def _select_session(self, row: int) -> None:
+        self._session_display.clear()
+        if self._active_campaign is None or not (0 <= row < self._session_list.count()):
+            return
+        session_id = self._session_list.item(row).text()
+        try:
+            entries = load_transcript(self._active_campaign.directory, session_id)
+        except ValueError as exc:
+            QMessageBox.critical(self, "Session load error", str(exc))
+            return
+        lines: list[str] = []
+        for entry in entries:
+            label = "GM (private)" if entry.private else entry.speaker.capitalize()
+            lines.append(f"<b>{html.escape(label)}:</b> {html.escape(entry.text)}")
+        self._session_display.setHtml("<br>".join(lines))
 
     def _select_speaker(self, row: int) -> None:
         if self._active_campaign is None or not (0 <= row < len(self._active_campaign.speakers)):
@@ -868,7 +931,56 @@ class MainWindow(QMainWindow):
             text,
             private=private,
         )
+        if self._recording_session_id is not None:
+            append_transcript(
+                self._active_campaign.directory,
+                self._recording_session_id,
+                speaker,
+                text,
+                private=private,
+            )
         self._append_transcript_display(speaker, text, private=private)
+
+    def _toggle_session_recording(self) -> None:
+        if self._active_campaign is None:
+            return
+        if self._recording_session_id is not None:
+            self._recording_session_id = None
+            self._record_button.setText("Record session")
+            self._stop_session_button.setEnabled(False)
+            self.statusBar().showMessage("Session recording stopped")
+            self._load_session_list()
+            if self._session_list.count():
+                self._session_list.setCurrentRow(self._session_list.count() - 1)
+            return
+        session_id, accepted = QInputDialog.getText(
+            self,
+            "Record session",
+            "Session ID (used for the filename)",
+            text=f"table-{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}",
+        )
+        if not accepted or not session_id.strip():
+            return
+        session_id = session_id.strip().replace("\\", "/").replace(" ", "-")
+        if session_id.endswith(".jsonl"):
+            session_id = session_id[: -len(".jsonl")]
+        if not session_id.startswith("table-"):
+            session_id = "table-" + session_id
+        self._recording_session_id = session_id
+        self._record_button.setText("Stop recording")
+        self._stop_session_button.setEnabled(True)
+        self._load_session_list()
+        self._session_list.setCurrentRow(
+            next(
+                (
+                    i
+                    for i in range(self._session_list.count())
+                    if self._session_list.item(i).text() == self._recording_session_id
+                ),
+                0,
+            )
+        )
+        self.statusBar().showMessage(f"Recording session: {self._recording_session_id}")
 
     def _send_player_text(self) -> None:
         text = self._player_input.text().strip()

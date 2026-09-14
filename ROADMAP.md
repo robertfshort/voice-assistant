@@ -29,8 +29,9 @@ The early alpha build currently supports:
 - PC/speaker profiles: A `pcs/` directory for player and named speaker profiles, an editable speaker list, and active speaker context fed into the NPC prompt
 - GM-controlled character TTS: A "Speak as NPC" button that lets the GM type text and speak it through the active NPC's configured Gemini voice without running the conversational AI
 - TTS mood tags: `[[whisper]]`, `[[nervously]]`, `[[/mood]]`, and similar tags in the typed line switch the TTS delivery for the following segment
+- Play session recording: A "Record session" button that writes all player, GM, and NPC turns into a shared `sessions/table-<id>.jsonl` file, with a Session tab to review the transcript
 
-The next roadmap step is the next feature from the **## Future feature notes** section, likely one of play session transcription with speaker attribution or in-app spell check.
+The next roadmap step is the next feature from the **## Future feature notes** section, likely one of play session transcription with speaker attribution, in-app spell check, or the Piper/local TTS provider plan.
 
 ## Product direction
 
