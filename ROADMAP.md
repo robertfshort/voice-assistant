@@ -28,6 +28,7 @@ The early alpha build currently supports:
 - Proposed lore from sessions: Review and edit AI-proposed public facts from a session transcript and create new lore files with GM approval
 - PC/speaker profiles: A `pcs/` directory for player and named speaker profiles, an editable speaker list, and active speaker context fed into the NPC prompt
 - GM-controlled character TTS: A "Speak as NPC" button that lets the GM type text and speak it through the active NPC's configured Gemini voice without running the conversational AI
+- NPC portrait or token image: Browse for a portrait image in the create/edit NPC dialog; the image is copied to `characters/<id>/portrait.*` and displayed in the dialog as a preview
 - TTS mood tags: `[[whisper]]`, `[[nervously]]`, `[[/mood]]`, and similar tags in the typed line switch the TTS delivery for the following segment
 - Play session recording: A "Record session" button that writes all player, GM, and NPC turns into a shared `sessions/table-<id>.jsonl` file, with a Session tab to review the transcript
 - Conversation curation: Right-click a transcript line or selection to "Promote to lore" or "Promote to memory" for the active NPC

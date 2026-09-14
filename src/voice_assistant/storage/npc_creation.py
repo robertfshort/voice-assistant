@@ -16,6 +16,26 @@ if TYPE_CHECKING:
 
 _NPC_ID = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 _PROFILE_SECTION = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
+_PORTRAIT_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}
+
+
+def _remove_portraits(directory: Path) -> None:
+    for ext in _PORTRAIT_EXTS:
+        path = directory / f"portrait{ext}"
+        if path.exists():
+            path.unlink()
+
+
+def _write_portrait(source: str | None, target: Path) -> None:
+    if not source:
+        return
+    source_path = Path(source).expanduser()
+    if not source_path.exists():
+        return
+    if source_path.suffix.lower() not in _PORTRAIT_EXTS:
+        return
+    _remove_portraits(target)
+    shutil.copy2(source_path, target / f"portrait{source_path.suffix.lower()}")
 
 
 class NpcDraft(BaseModel):
@@ -32,6 +52,7 @@ class NpcDraft(BaseModel):
     mood: str = "neutral"
     speaking_style: str = "natural"
     gemini_voice: str = "Aoede"
+    portrait: str | None = None
 
 
 def _profile(draft: NpcDraft) -> str:
@@ -107,6 +128,7 @@ def create_npc(campaign_directory: Path, draft: NpcDraft) -> Path:
         (staging / "voice.yaml").write_text(
             yaml.safe_dump(voice, sort_keys=False), encoding="utf-8", newline="\n"
         )
+        _write_portrait(draft.portrait, staging)
         staging.replace(destination)
     except OSError as exc:
         if staging.exists():
@@ -137,6 +159,7 @@ def draft_from_npc(npc: Npc) -> NpcDraft:
         mood=style_parts[0] if style_parts else "neutral",
         speaking_style=sections.get("speaking style", "natural"),
         gemini_voice=provider.voice if provider else "Aoede",
+        portrait=(npc.directory / npc.portrait).as_posix() if npc.portrait else None,
     )
 
 
@@ -165,6 +188,7 @@ def update_npc(campaign_directory: Path, draft: NpcDraft) -> Path:
             yaml.safe_dump(_voice(draft, existing_voice), sort_keys=False),
             action="edit-npc-voice",
         )
+        _write_portrait(draft.portrait, directory)
     except (OSError, yaml.YAMLError) as exc:
         raise CampaignError(f"Unable to update NPC {draft.id}: {exc}") from exc
     return directory

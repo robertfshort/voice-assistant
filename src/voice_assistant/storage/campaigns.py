@@ -127,6 +127,7 @@ def _load_npc(directory: Path) -> Npc:
             f"Invalid voice configuration in {directory / 'voice.yaml'}: {exc}"
         ) from exc
     secrets_path = directory / "secrets.md"
+    portrait = _find_portrait(directory)
     return Npc(
         id=directory.name,
         name=title.group(1).strip(),
@@ -136,7 +137,16 @@ def _load_npc(directory: Path) -> Npc:
         secrets=parse_secrets(_read_text(secrets_path), secrets_path),
         affiliations=_parse_affiliations(sections.get("affiliations", "")),
         voice=voice,
+        portrait=portrait,
     )
+
+
+def _find_portrait(directory: Path) -> str | None:
+    for ext in (".png", ".jpg", ".jpeg", ".webp", ".bmp"):
+        path = directory / f"portrait{ext}"
+        if path.exists():
+            return f"portrait{ext}"
+    return None
 
 
 _LORE_FRONT_MATTER = re.compile(r"^---\s*\n(.*?)\n---\s*\n(.*)$", re.DOTALL)

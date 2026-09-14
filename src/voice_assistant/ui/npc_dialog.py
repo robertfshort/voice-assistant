@@ -3,12 +3,15 @@ from __future__ import annotations
 import asyncio
 import re
 
+from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
     QDialogButtonBox,
+    QFileDialog,
     QFormLayout,
     QHBoxLayout,
+    QLabel,
     QLineEdit,
     QMessageBox,
     QPushButton,
@@ -102,6 +105,21 @@ class NpcDialog(QDialog):
         form.addRow("Speaking style", self._field_with_ai(self.style_input, "speaking_style"))
         form.addRow("Voice gender", self.voice_gender_input)
         form.addRow("Gemini voice", self._field_with_ai(self.voice_input, "gemini_voice"))
+
+        self.portrait_input = QLineEdit()
+        self.portrait_input.setReadOnly(True)
+        self.portrait_browse_button = QPushButton("Browse…")
+        self.portrait_browse_button.clicked.connect(self._browse_portrait)
+        self.portrait_preview = QLabel()
+        self.portrait_preview.setFixedSize(128, 128)
+        self.portrait_preview.setScaledContents(True)
+        self.portrait_preview.setStyleSheet("border: 1px solid gray;")
+        portrait_layout = QHBoxLayout()
+        portrait_layout.addWidget(self.portrait_input, 1)
+        portrait_layout.addWidget(self.portrait_browse_button)
+        portrait_layout.addWidget(self.portrait_preview)
+        form.addRow("Portrait", portrait_layout)
+
         layout.addLayout(form)
 
         action_row = QHBoxLayout()
@@ -140,6 +158,30 @@ class NpcDialog(QDialog):
         self.mood_input.setCurrentText(draft.mood)
         self.style_input.setCurrentText(draft.speaking_style)
         self._set_voice(draft.gemini_voice)
+        if draft.portrait:
+            self.portrait_input.setText(draft.portrait)
+            self._load_portrait_preview(draft.portrait)
+
+    def _browse_portrait(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select portrait image",
+            "",
+            "Images (*.png *.jpg *.jpeg *.webp *.bmp)",
+        )
+        if path:
+            self.portrait_input.setText(path)
+            self._load_portrait_preview(path)
+
+    def _load_portrait_preview(self, path: str) -> None:
+        if not path:
+            self.portrait_preview.clear()
+            return
+        pixmap = QPixmap(path)
+        if not pixmap.isNull():
+            self.portrait_preview.setPixmap(pixmap)
+        else:
+            self.portrait_preview.clear()
 
     def _on_gender_changed(self) -> None:
         gender = self.voice_gender_input.currentText()
@@ -390,4 +432,5 @@ class NpcDialog(QDialog):
             mood=self.mood_input.currentText().strip(),
             speaking_style=self.style_input.currentText().strip(),
             gemini_voice=self.voice_input.currentText(),
+            portrait=self.portrait_input.text().strip() or None,
         )

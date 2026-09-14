@@ -39,6 +39,7 @@ class Npc(BaseModel):
     secrets: tuple[Secret, ...] = ()
     affiliations: tuple[str, ...] = ()
     voice: VoiceConfig = Field(default_factory=VoiceConfig)
+    portrait: str | None = None
 
 
 class LoreSection(BaseModel):

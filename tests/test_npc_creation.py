@@ -98,6 +98,19 @@ def test_draft_from_npc_reads_editable_profile_fields(tmp_path: Path) -> None:
     assert draft.gemini_voice == "Charon"
 
 
+def test_create_npc_copies_portrait_image(tmp_path: Path) -> None:
+    campaign_directory = _campaign(tmp_path)
+    source = tmp_path / "source.png"
+    source.write_bytes(b"dummy")
+    draft = _draft().model_copy(update={"portrait": str(source)})
+
+    create_npc(campaign_directory, draft)
+    npc = load_campaign(campaign_directory).npc("guildmaster-vale")
+
+    assert npc.portrait == "portrait.png"
+    assert (npc.directory / "portrait.png").exists()
+
+
 @pytest.mark.parametrize("npc_id", ("Guildmaster", "../vale", "vale smith", ""))
 def test_create_npc_rejects_unsafe_ids(tmp_path: Path, npc_id: str) -> None:
     with pytest.raises(CampaignError, match="NPC ID"):
