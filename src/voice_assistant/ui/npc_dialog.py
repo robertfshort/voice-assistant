@@ -61,6 +61,11 @@ class NpcDialog(QDialog):
         self.goals_input.setMaximumHeight(80)
         self.public_knowledge_input = QTextEdit()
         self.public_knowledge_input.setMaximumHeight(80)
+        self.affiliations_input = QTextEdit()
+        self.affiliations_input.setMaximumHeight(80)
+        self.affiliations_input.setToolTip(
+            "One per line, or comma-separated. Used for restricted lore."
+        )
         self.mood_input = QComboBox()
         self.mood_input.setEditable(True)
         self.mood_input.addItems(
@@ -90,6 +95,7 @@ class NpcDialog(QDialog):
             "Public knowledge",
             self._field_with_ai(self.public_knowledge_input, "public_knowledge", flesh_out=True),
         )
+        form.addRow("Affiliations", self.affiliations_input)
         form.addRow("Mood", self._field_with_ai(self.mood_input, "mood"))
         form.addRow("Speaking style", self._field_with_ai(self.style_input, "speaking_style"))
         form.addRow("Voice gender", self.voice_gender_input)
@@ -128,6 +134,7 @@ class NpcDialog(QDialog):
         self.background_input.setPlainText(draft.background)
         self.goals_input.setPlainText(draft.goals)
         self.public_knowledge_input.setPlainText(draft.public_knowledge)
+        self.affiliations_input.setPlainText(draft.affiliations)
         self.mood_input.setCurrentText(draft.mood)
         self.style_input.setCurrentText(draft.speaking_style)
         self._set_voice(draft.gemini_voice)
@@ -201,6 +208,7 @@ class NpcDialog(QDialog):
             "background": self.background_input.toPlainText().strip(),
             "goals": self.goals_input.toPlainText().strip(),
             "public_knowledge": self.public_knowledge_input.toPlainText().strip(),
+            "affiliations": self.affiliations_input.toPlainText().strip(),
             "mood": self.mood_input.currentText().strip(),
             "speaking_style": self.style_input.currentText().strip(),
             "gemini_voice": self.voice_input.currentText(),
@@ -287,6 +295,7 @@ class NpcDialog(QDialog):
             "background": self.background_input,
             "goals": self.goals_input,
             "public_knowledge": self.public_knowledge_input,
+            "affiliations": self.affiliations_input,
         }
         widget = text_fields.get(field)
         if isinstance(widget, QLineEdit):
@@ -367,6 +376,7 @@ class NpcDialog(QDialog):
             background=self.background_input.toPlainText().strip(),
             goals=self.goals_input.toPlainText().strip(),
             public_knowledge=self.public_knowledge_input.toPlainText().strip(),
+            affiliations=self.affiliations_input.toPlainText().strip(),
             mood=self.mood_input.currentText().strip(),
             speaking_style=self.style_input.currentText().strip(),
             gemini_voice=self.voice_input.currentText(),

@@ -28,6 +28,7 @@ def _draft(npc_id: str = "guildmaster-vale") -> NpcDraft:
         background="A former caravan factor.",
         goals="Keep trade routes open.",
         public_knowledge="Guild dues increased this year.",
+        affiliations="- Merchants Guild\n- Order of the Rose",
         mood="confident",
         speaking_style="measured",
         gemini_voice="Charon",
@@ -47,6 +48,8 @@ def test_create_npc_writes_a_loadable_portable_character(tmp_path: Path) -> None
     assert "A former caravan factor." in npc.profile
     assert "Keep trade routes open." in npc.profile
     assert "Guild dues increased this year." in npc.profile
+    assert "Merchants Guild" in npc.profile
+    assert npc.affiliations == ("Merchants Guild", "Order of the Rose")
     assert npc.voice.style == "confident, measured"
     assert npc.voice.providers["gemini"].voice == "Charon"
     assert npc.secrets == ()
@@ -91,6 +94,7 @@ def test_draft_from_npc_reads_editable_profile_fields(tmp_path: Path) -> None:
     assert draft.name == "Guildmaster Vale"
     assert draft.role == "Leader of the merchants guild."
     assert draft.background == "A former caravan factor."
+    assert draft.affiliations == "- Merchants Guild\n- Order of the Rose"
     assert draft.gemini_voice == "Charon"
 
 

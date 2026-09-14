@@ -6,11 +6,23 @@ import re
 from voice_assistant.domain.models import Campaign, LoreRecord, Npc
 
 _SAFE_ID = re.compile(r"[^a-z0-9-]+")
-_NPC_VISIBLE = {"public", "restricted"}
 
 
-def _lore_for_npc(records: dict[str, LoreRecord]) -> str:
-    visible = [record for record in records.values() if record.visibility in _NPC_VISIBLE]
+def _npc_scope_keys(npc: Npc) -> set[str]:
+    return {key.strip().lower() for key in (*npc.affiliations, npc.id)}
+
+
+def _lore_for_npc(records: dict[str, LoreRecord], npc: Npc) -> str:
+    scope_keys = _npc_scope_keys(npc)
+    visible: list[LoreRecord] = []
+    for record in records.values():
+        if record.visibility == "public":
+            visible.append(record)
+            continue
+        if record.visibility == "restricted" and record.scopes:
+            record_scopes = {scope.strip().lower() for scope in record.scopes}
+            if scope_keys & record_scopes:
+                visible.append(record)
     if not visible:
         return ""
     return "\n\n".join(
@@ -45,7 +57,7 @@ def build_npc_prompt(
     if npc.memory.strip():
         sections.extend(("# NPC memory", npc.memory.strip()))
     if campaign.lore_records:
-        lore = _lore_for_npc(campaign.lore_records)
+        lore = _lore_for_npc(campaign.lore_records, npc)
         if lore:
             sections.extend(("# Campaign lore available to this NPC", lore))
     if private_directions:

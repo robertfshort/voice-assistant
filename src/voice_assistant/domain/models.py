@@ -37,6 +37,7 @@ class Npc(BaseModel):
     profile: str
     memory: str = ""
     secrets: tuple[Secret, ...] = ()
+    affiliations: tuple[str, ...] = ()
     voice: VoiceConfig = Field(default_factory=VoiceConfig)
 
 

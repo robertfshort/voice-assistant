@@ -91,12 +91,32 @@ def parse_secrets(text: str, source: Path) -> tuple[Secret, ...]:
     return tuple(secrets)
 
 
+def _profile_sections(text: str) -> dict[str, str]:
+    matches = list(_PROFILE_SECTION.finditer(text))
+    sections: dict[str, str] = {}
+    for index, match in enumerate(matches):
+        heading = match.group(1).strip().lower()
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
+        sections[heading] = text[match.end() : end].strip()
+    return sections
+
+
+def _parse_affiliations(text: str) -> tuple[str, ...]:
+    bullets = _AFFILIATION_ITEM.findall(text)
+    if bullets:
+        return tuple(bullet.strip() for bullet in bullets if bullet.strip())
+    return tuple(
+        part.strip() for line in text.splitlines() for part in line.split(",") if part.strip()
+    )
+
+
 def _load_npc(directory: Path) -> Npc:
     profile_path = directory / "profile.md"
     profile = _read_text(profile_path, required=True)
     title = _PROFILE_HEADING.search(profile)
     if title is None:
         raise CampaignError(f"NPC profile has no level-one heading: {profile_path}")
+    sections = _profile_sections(profile)
     try:
         voice = VoiceConfig.model_validate(_read_yaml(directory / "voice.yaml"))
     except ValidationError as exc:
@@ -111,11 +131,14 @@ def _load_npc(directory: Path) -> Npc:
         profile=profile,
         memory=_read_text(directory / "memory.md"),
         secrets=parse_secrets(_read_text(secrets_path), secrets_path),
+        affiliations=_parse_affiliations(sections.get("affiliations", "")),
         voice=voice,
     )
 
 
 _LORE_FRONT_MATTER = re.compile(r"^---\s*\n(.*?)\n---\s*\n(.*)$", re.DOTALL)
+_PROFILE_SECTION = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
+_AFFILIATION_ITEM = re.compile(r"^[-*]\s+(.+)$", re.MULTILINE)
 
 
 def _derive_lore_title(lore_id: str) -> str:

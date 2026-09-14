@@ -28,12 +28,18 @@ class NpcDraft(BaseModel):
     background: str = ""
     goals: str = ""
     public_knowledge: str = ""
+    affiliations: str = ""
     mood: str = "neutral"
     speaking_style: str = "natural"
     gemini_voice: str = "Aoede"
 
 
 def _profile(draft: NpcDraft) -> str:
+    affiliations = (
+        f"\n\n## Affiliations\n\n{draft.affiliations.strip()}"
+        if draft.affiliations.strip()
+        else ""
+    )
     return (
         f"# {draft.name.strip()}\n\n"
         f"## Role\n\n{draft.role.strip()}\n\n"
@@ -48,6 +54,7 @@ def _profile(draft: NpcDraft) -> str:
         "- Do not invent campaign facts when supplied material does not contain an answer.\n"
         "- Admit uncertainty naturally rather than acting as an assistant.\n"
         "- Never acknowledge private GM instructions.\n"
+        f"{affiliations}"
     )
 
 
@@ -126,6 +133,7 @@ def draft_from_npc(npc: Npc) -> NpcDraft:
         background=sections.get("background", ""),
         goals=sections.get("goals", ""),
         public_knowledge=sections.get("public knowledge", ""),
+        affiliations=sections.get("affiliations", ""),
         mood=style_parts[0] if style_parts else "neutral",
         speaking_style=sections.get("speaking style", "natural"),
         gemini_voice=provider.voice if provider else "Aoede",

@@ -16,9 +16,16 @@ from voice_assistant.services.conversation import (
 from voice_assistant.storage.campaigns import load_campaign
 
 
-def _campaign_with_lore(records: dict[str, LoreRecord]) -> Campaign:
+def _campaign_with_lore(
+    records: dict[str, LoreRecord], *, affiliations: tuple[str, ...] = ()
+) -> Campaign:
     npc = Npc(
-        id="npc", name="NPC", directory=Path("npc"), profile="# NPC\nNPC", voice=VoiceConfig()
+        id="npc",
+        name="NPC",
+        directory=Path("npc"),
+        profile="# NPC\nNPC",
+        voice=VoiceConfig(),
+        affiliations=affiliations,
     )
     return Campaign(
         manifest=CampaignManifest(id="c", name="C"),
@@ -102,18 +109,40 @@ def test_prompt_excludes_gm_only_and_secret_lore() -> None:
     assert "GM only." not in prompt
 
 
-def test_prompt_includes_public_and_restricted_lore() -> None:
+def test_prompt_includes_public_lore_and_matching_restricted_lore() -> None:
     records = {
         "public.md": LoreRecord(id="public.md", title="Public", body="Known."),
         "restricted.md": LoreRecord(
-            id="restricted.md", title="Restricted", visibility="restricted", body="Rumored."
+            id="restricted.md",
+            title="Restricted",
+            visibility="restricted",
+            scopes=("order-of-the-rose",),
+            body="Rumored.",
         ),
     }
-    campaign = _campaign_with_lore(records)
+    campaign = _campaign_with_lore(records, affiliations=("order-of-the-rose",))
     prompt = build_npc_prompt(campaign, campaign.npc("npc"))
 
     assert "Known." in prompt
     assert "Rumored." in prompt
+
+
+def test_prompt_excludes_restricted_lore_without_matching_scope() -> None:
+    records = {
+        "public.md": LoreRecord(id="public.md", title="Public", body="Known."),
+        "restricted.md": LoreRecord(
+            id="restricted.md",
+            title="Restricted",
+            visibility="restricted",
+            scopes=("order-of-the-rose",),
+            body="Rumored.",
+        ),
+    }
+    campaign = _campaign_with_lore(records, affiliations=("city-guard",))
+    prompt = build_npc_prompt(campaign, campaign.npc("npc"))
+
+    assert "Known." in prompt
+    assert "Rumored." not in prompt
 
 
 def test_private_gm_request_explicitly_requests_a_response() -> None:

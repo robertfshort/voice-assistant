@@ -19,8 +19,9 @@ The early alpha build currently supports:
 - UI theming: light, dark, dungeon, and tavern
 - Structured lore records with visibility, scopes, provenance, and status
 - NPC prompt filtering for public/restricted lore; secret and GM-only lore is hidden
+- NPC affiliations stored in profiles and used to filter restricted lore by scope
 
-The next roadmap step is **NPC affiliations and organization-based lore scope filtering**.
+The next roadmap step is **explainable knowledge resolution** (show the GM why each piece of lore was included for an NPC).
 
 ## Product direction
 
