@@ -1,5 +1,23 @@
 # Product Roadmap and Future Design Notes
 
+## Current implementation status
+
+The early alpha build currently supports:
+
+- Conversational NPC vertical slice (Gemini Live, RoomKit rooms, per-NPC prompt, transcripts)
+- Multi-NPC switching and isolation (two sample NPCs and automated tests)
+- Campaign editing:
+  - View and edit lore
+  - Create new lore entries
+  - Append NPC knowledge
+  - Create and edit NPCs
+  - Duplicate NPC as a starting template
+- 30 Gemini TTS voices with Male/Female filter
+- Voice preview in the create/edit NPC dialog
+- UI theming: light, dark, dungeon, and tavern
+
+The next roadmap step is **change tracking and backup behavior** for campaign edits.
+
 ## Product direction
 
 The initial product is a portable RPG voice assistant, but its campaign, lore, NPC, organization, and session requirements may naturally develop into a larger campaign-management system.

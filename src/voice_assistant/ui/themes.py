@@ -127,9 +127,7 @@ def valid_theme(name: str) -> bool:
     return name in THEME_NAMES
 
 
-def apply_theme(
-    name: str, target: QApplication | QWidget | None = None
-) -> None:
+def apply_theme(name: str, target: QApplication | QWidget | None = None) -> None:
     if not valid_theme(name):
         raise ValueError(f"Unknown theme: {name!r}. Available: {', '.join(THEME_NAMES)}")
     widget = target or QApplication.instance()

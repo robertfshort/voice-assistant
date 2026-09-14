@@ -4,6 +4,7 @@ import re
 from pathlib import Path
 
 from voice_assistant.domain.errors import CampaignError
+from voice_assistant.storage.change_tracking import write_with_backup
 
 _NPC_ID = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 
@@ -18,18 +19,22 @@ def npc_memory_path(campaign_directory: Path, npc_id: str) -> Path:
     return npc_directory / "memory.md"
 
 
-def save_npc_knowledge(campaign_directory: Path, npc_id: str, content: str) -> Path:
+def save_npc_knowledge(
+    campaign_directory: Path, npc_id: str, content: str, *, reason: str = ""
+) -> Path:
     destination = npc_memory_path(campaign_directory, npc_id)
-    temporary = destination.with_suffix(".md.tmp")
-    try:
-        temporary.write_text(content, encoding="utf-8", newline="\n")
-        temporary.replace(destination)
-    except OSError as exc:
-        raise CampaignError(f"Unable to save NPC knowledge {destination}: {exc}") from exc
-    return destination
+    return write_with_backup(
+        campaign_directory,
+        destination,
+        content,
+        action="edit-npc-knowledge",
+        reason=reason,
+    )
 
 
-def append_npc_knowledge(campaign_directory: Path, npc_id: str, addition: str) -> str:
+def append_npc_knowledge(
+    campaign_directory: Path, npc_id: str, addition: str, *, reason: str = ""
+) -> str:
     destination = npc_memory_path(campaign_directory, npc_id)
     try:
         existing = destination.read_text(encoding="utf-8") if destination.exists() else ""
@@ -37,5 +42,5 @@ def append_npc_knowledge(campaign_directory: Path, npc_id: str, addition: str) -
         raise CampaignError(f"Unable to read NPC knowledge {destination}: {exc}") from exc
     separator = "\n\n" if existing.strip() else ""
     updated = f"{existing.rstrip()}{separator}{addition.strip()}\n"
-    save_npc_knowledge(campaign_directory, npc_id, updated)
+    save_npc_knowledge(campaign_directory, npc_id, updated, reason=reason)
     return updated

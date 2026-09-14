@@ -9,6 +9,7 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
 from voice_assistant.domain.errors import CampaignError
+from voice_assistant.storage.change_tracking import write_with_backup
 
 if TYPE_CHECKING:
     from voice_assistant.domain.models import Npc
@@ -142,18 +143,20 @@ def update_npc(campaign_directory: Path, draft: NpcDraft) -> Path:
         existing_voice = yaml.safe_load(voice_path.read_text(encoding="utf-8")) or {}
         if not isinstance(existing_voice, dict):
             raise CampaignError(f"Expected a YAML mapping in {voice_path}")
-        profile_temporary = directory / ".profile.md.tmp"
-        voice_temporary = directory / ".voice.yaml.tmp"
-        profile_temporary.write_text(_profile(draft), encoding="utf-8", newline="\n")
-        voice_temporary.write_text(
-            yaml.safe_dump(_voice(draft, existing_voice), sort_keys=False),
-            encoding="utf-8",
-            newline="\n",
+        campaign_directory = directory.parent.parent
+        profile_path = directory / "profile.md"
+        write_with_backup(
+            campaign_directory,
+            profile_path,
+            _profile(draft),
+            action="edit-npc",
         )
-        profile_temporary.replace(directory / "profile.md")
-        voice_temporary.replace(voice_path)
+        write_with_backup(
+            campaign_directory,
+            voice_path,
+            yaml.safe_dump(_voice(draft, existing_voice), sort_keys=False),
+            action="edit-npc-voice",
+        )
     except (OSError, yaml.YAMLError) as exc:
-        for temporary in (directory / ".profile.md.tmp", directory / ".voice.yaml.tmp"):
-            temporary.unlink(missing_ok=True)
         raise CampaignError(f"Unable to update NPC {draft.id}: {exc}") from exc
     return directory

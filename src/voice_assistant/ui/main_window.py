@@ -453,8 +453,20 @@ class MainWindow(QMainWindow):
         if self._active_campaign is None or self._active_npc is None:
             return
         content = self._knowledge_editor.toPlainText()
+        reason, accepted = QInputDialog.getText(
+            self,
+            "Save NPC knowledge",
+            "Reason for this change (optional)",
+        )
+        if not accepted:
+            return
         try:
-            save_npc_knowledge(self._active_campaign.directory, self._active_npc.id, content)
+            save_npc_knowledge(
+                self._active_campaign.directory,
+                self._active_npc.id,
+                content,
+                reason=reason,
+            )
         except ValueError as exc:
             QMessageBox.critical(self, "NPC knowledge save error", str(exc))
             return
@@ -535,8 +547,20 @@ class MainWindow(QMainWindow):
         if self._active_campaign is None or self._active_lore_id is None:
             return
         content = self._lore_editor.toPlainText()
+        reason, accepted = QInputDialog.getText(
+            self,
+            "Save lore",
+            "Reason for this change (optional)",
+        )
+        if not accepted:
+            return
         try:
-            save_lore(self._active_campaign.directory, self._active_lore_id, content)
+            save_lore(
+                self._active_campaign.directory,
+                self._active_lore_id,
+                content,
+                reason=reason,
+            )
         except ValueError as exc:
             QMessageBox.critical(self, "Lore save error", str(exc))
             return

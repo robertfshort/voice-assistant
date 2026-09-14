@@ -124,8 +124,11 @@ def test_player_and_gm_inputs_are_visibly_distinct(qtbot: QtBot, tmp_path: Path)
 
 
 def test_npc_knowledge_can_be_edited_and_appended_without_crossing_npcs(
-    qtbot: QtBot, tmp_path: Path
+    qtbot: QtBot, tmp_path: Path, monkeypatch: MonkeyPatch
 ) -> None:
+    monkeypatch.setattr(
+        main_window_module.QInputDialog, "getText", lambda *a, **k: ("Updated memory", True)
+    )
     campaign_root = tmp_path / "campaigns"
     shutil.copytree(REPOSITORY_ROOT / "examples" / "campaigns", campaign_root)
     window = MainWindow(campaign_root)
@@ -171,7 +174,12 @@ def test_lore_entry_can_be_created_and_selected(
     assert window._lore_editor.toPlainText() == "# Three Roads\n\n"
 
 
-def test_lore_can_be_viewed_and_saved(qtbot: QtBot, tmp_path: Path) -> None:
+def test_lore_can_be_viewed_and_saved(
+    qtbot: QtBot, tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        main_window_module.QInputDialog, "getText", lambda *a, **k: ("Added fact", True)
+    )
     campaign_root = tmp_path / "campaigns"
     shutil.copytree(REPOSITORY_ROOT / "examples" / "campaigns", campaign_root)
     window = MainWindow(campaign_root)

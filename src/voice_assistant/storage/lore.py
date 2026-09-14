@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path, PurePosixPath
 
 from voice_assistant.domain.errors import CampaignError
+from voice_assistant.storage.change_tracking import write_with_backup
 
 _ALLOWED_SUFFIXES = {".md", ".txt"}
 
@@ -36,14 +37,10 @@ def create_lore(campaign_directory: Path, lore_id: str, content: str) -> Path:
     return destination
 
 
-def save_lore(campaign_directory: Path, lore_id: str, content: str) -> Path:
+def save_lore(campaign_directory: Path, lore_id: str, content: str, *, reason: str = "") -> Path:
     destination = lore_path(campaign_directory, lore_id)
     if not destination.exists():
         raise CampaignError(f"Lore file does not exist: {destination}")
-    temporary = destination.with_suffix(f"{destination.suffix}.tmp")
-    try:
-        temporary.write_text(content, encoding="utf-8", newline="\n")
-        temporary.replace(destination)
-    except OSError as exc:
-        raise CampaignError(f"Unable to save lore file {destination}: {exc}") from exc
-    return destination
+    return write_with_backup(
+        campaign_directory, destination, content, action="edit-lore", reason=reason
+    )
