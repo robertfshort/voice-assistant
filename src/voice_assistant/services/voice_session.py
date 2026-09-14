@@ -133,9 +133,23 @@ class VoiceSessionController(QObject):
         if self._campaign is None or self._npc is None:
             return
         self._private_directions = (*self._private_directions, text.strip())
-        campaign, npc, api_key, model = self._campaign, self._npc, self._api_key, self._model
-        await self.stop()
-        await self.start(campaign, npc, api_key, model=model)
+        updated_prompt = build_npc_prompt(
+            self._campaign,
+            self._npc,
+            private_directions=self._private_directions,
+        )
+        try:
+            await self._channel.reconfigure_session(self._session, system_prompt=updated_prompt)
+        except Exception:
+            logger.exception("Reconfigure failed; restarting voice session")
+            campaign, npc, api_key, model = (
+                self._campaign,
+                self._npc,
+                self._api_key,
+                self._model,
+            )
+            await self.stop()
+            await self.start(campaign, npc, api_key, model=model)
 
     def _on_transcription(self, _session: Any, text: str, role: str, is_final: bool) -> None:
         self.transcription.emit(text, role, is_final)
