@@ -95,13 +95,15 @@ Implemented in the first Piper pass:
 - Safe local model import that copies `.onnx`/`.json` assets into the shared voice folder and updates `voices.yaml`.
 - Automatic PCM resampling to a selected device's supported default rate when it rejects Piper's native rate.
 - Per-NPC sentence-silence control stored in portable `voice.yaml`.
+- Searchable upstream Piper catalog with language, country, quality, speaker count, and download size.
+- Explicit confirmed downloads with MD5 integrity verification and automatic portable registry updates.
 
 Remaining provider work:
 
 - Add a `system` provider (`pyttsx3` / `espeak`).
 - Optional expert overrides for explicit output sample rate and channels.
 - System TTS should ignore unsupported mood tags and speak the text.
-- Voice model discovery/download UI with license, language, quality, size, and checksum metadata.
+- Fetch and display upstream model-card license details before download when available.
 - Add the same provider fallback and resampling behavior to every future conversation TTS path.
 
 ### Spell check
