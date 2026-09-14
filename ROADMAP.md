@@ -72,6 +72,13 @@ Development should preserve that possibility without requiring the first release
 - Respect campaign-specific names, places, and terms so the GM can add words to a campaign dictionary and avoid false positives.
 - Keep the dictionary portable and editable alongside the campaign files.
 
+### Conversation curation
+
+- Add a right-click context menu on a line of dialog or a selected range in the conversation transcript to promote it to lore.
+- Let the GM choose to append the snippet to an existing lore entry or create a new one.
+- Pre-fill the lore with a default title, the speaker, the NPC, and a timestamp provenance.
+- Keep the promotion flow in a review dialog so AI-generated or improvised dialogue cannot become canon without GM approval.
+
 ## Near-term requirements
 
 ### Lore and NPC knowledge management
