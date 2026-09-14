@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from voice_assistant.domain.errors import CampaignError
+from voice_assistant.services.conversation import build_npc_prompt
 from voice_assistant.storage.campaigns import (
     discover_campaigns,
     load_campaign,
@@ -32,6 +33,9 @@ def test_load_sample_campaign() -> None:
     assert rell.secrets[0].id == "compromised-patrol"
     assert "lanterns-rest.md" in campaign.lore
     assert "opening.md" in campaign.scripts
+    assert "lanterns-rest.md" in campaign.lore_records
+    assert campaign.lore_records["lanterns-rest.md"].visibility == "public"
+    assert campaign.lore_records["lanterns-rest.md"].title == "Lanterns Rest"
 
 
 def test_discover_campaigns_ignores_non_campaign_directories(tmp_path: Path) -> None:
@@ -83,3 +87,34 @@ def test_missing_default_npc_is_rejected(tmp_path: Path) -> None:
 
     with pytest.raises(CampaignError, match="Default NPC"):
         load_campaign(campaign)
+
+
+def test_lore_front_matter_is_parsed_and_filters_prompts(tmp_path: Path) -> None:
+    (tmp_path / "campaign.yaml").write_text("id: test\nname: Test\n", encoding="utf-8")
+    character = tmp_path / "characters" / "npc"
+    character.mkdir(parents=True)
+    (character / "profile.md").write_text("# NPC\n", encoding="utf-8")
+    lore = tmp_path / "lore"
+    lore.mkdir()
+    (lore / "private.md").write_text(
+        "---\n"
+        "visibility: gm-only\n"
+        "scopes:\n"
+        "  - western-border\n"
+        "title: Hidden\n"
+        "---\n"
+        "Secret body.\n",
+        encoding="utf-8",
+    )
+    (lore / "public.md").write_text("Public body.\n", encoding="utf-8")
+
+    campaign = load_campaign(tmp_path)
+
+    assert campaign.lore_records["private.md"].visibility == "gm-only"
+    assert campaign.lore_records["private.md"].title == "Hidden"
+    assert campaign.lore_records["private.md"].scopes == ("western-border",)
+    assert campaign.lore_records["private.md"].body == "Secret body.\n"
+    assert campaign.lore_records["public.md"].visibility == "public"
+    assert campaign.lore_records["public.md"].title == "Public"
+    assert "Secret body." not in build_npc_prompt(campaign, campaign.npc("npc"))
+    assert "Public body." in build_npc_prompt(campaign, campaign.npc("npc"))

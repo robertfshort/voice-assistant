@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class Secret(BaseModel):
@@ -40,6 +40,32 @@ class Npc(BaseModel):
     voice: VoiceConfig = Field(default_factory=VoiceConfig)
 
 
+class LoreRecord(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    id: str
+    title: str
+    visibility: str = "public"
+    scopes: tuple[str, ...] = ()
+    provenance: str = "manual"
+    status: str = "established"
+    body: str = ""
+
+    @field_validator("visibility")
+    @classmethod
+    def _valid_visibility(cls, value: str) -> str:
+        if value not in {"public", "restricted", "secret", "gm-only"}:
+            raise ValueError(f"Invalid visibility: {value!r}")
+        return value
+
+    @field_validator("status")
+    @classmethod
+    def _valid_status(cls, value: str) -> str:
+        if value not in {"established", "proposed", "archived"}:
+            raise ValueError(f"Invalid status: {value!r}")
+        return value
+
+
 class CampaignManifest(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -56,6 +82,7 @@ class Campaign(BaseModel):
     directory: Path
     npcs: tuple[Npc, ...]
     lore: dict[str, str] = Field(default_factory=dict)
+    lore_records: dict[str, LoreRecord] = Field(default_factory=dict)
     scripts: dict[str, str] = Field(default_factory=dict)
 
     def npc(self, npc_id: str) -> Npc:

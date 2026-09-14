@@ -11,6 +11,7 @@ from voice_assistant.domain.errors import CampaignError
 from voice_assistant.domain.models import (
     Campaign,
     CampaignManifest,
+    LoreRecord,
     Npc,
     Secret,
     VoiceConfig,
@@ -114,6 +115,46 @@ def _load_npc(directory: Path) -> Npc:
     )
 
 
+_LORE_FRONT_MATTER = re.compile(r"^---\s*\n(.*?)\n---\s*\n(.*)$", re.DOTALL)
+
+
+def _derive_lore_title(lore_id: str) -> str:
+    stem = lore_id.rsplit(".", 1)[0] if "." in lore_id else lore_id
+    return stem.replace("-", " ").replace("_", " ").title()
+
+
+def _load_lore_records(directory: Path) -> dict[str, LoreRecord]:
+    if not directory.exists():
+        return {}
+    records: dict[str, LoreRecord] = {}
+    files = sorted(path for path in directory.rglob("*") if path.suffix.lower() in {".md", ".txt"})
+    for path in files:
+        lore_id = path.relative_to(directory).as_posix()
+        text = _read_text(path)
+        match = _LORE_FRONT_MATTER.match(text)
+        if match:
+            try:
+                metadata = yaml.safe_load(match.group(1)) or {}
+            except yaml.YAMLError as exc:
+                raise CampaignError(f"Invalid YAML front matter in {lore_id}: {exc}") from exc
+            if not isinstance(metadata, dict):
+                raise CampaignError(f"Expected a YAML mapping in front matter of {lore_id}")
+            body = match.group(2)
+        else:
+            metadata = {}
+            body = text
+        records[lore_id] = LoreRecord(
+            id=lore_id,
+            title=metadata.get("title") or _derive_lore_title(lore_id),
+            visibility=metadata.get("visibility", "public"),
+            scopes=tuple(metadata.get("scopes") or ()),
+            provenance=metadata.get("provenance", "manual"),
+            status=metadata.get("status", "established"),
+            body=body,
+        )
+    return records
+
+
 def _load_text_directory(directory: Path) -> dict[str, str]:
     if not directory.exists():
         return {}
@@ -144,11 +185,13 @@ def load_campaign(directory: Path) -> Campaign:
         raise CampaignError(
             f"Default NPC {manifest.default_npc!r} does not exist in {characters_directory}"
         )
+    lore_records = _load_lore_records(campaign_directory / "lore")
     return Campaign(
         manifest=manifest,
         directory=campaign_directory,
         npcs=npcs,
-        lore=_load_text_directory(campaign_directory / "lore"),
+        lore={id: record.body for id, record in lore_records.items()},
+        lore_records=lore_records,
         scripts=_load_text_directory(campaign_directory / "scripts"),
     )
 

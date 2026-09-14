@@ -3,9 +3,20 @@ from __future__ import annotations
 import hashlib
 import re
 
-from voice_assistant.domain.models import Campaign, Npc
+from voice_assistant.domain.models import Campaign, LoreRecord, Npc
 
 _SAFE_ID = re.compile(r"[^a-z0-9-]+")
+_NPC_VISIBLE = {"public", "restricted"}
+
+
+def _lore_for_npc(records: dict[str, LoreRecord]) -> str:
+    visible = [record for record in records.values() if record.visibility in _NPC_VISIBLE]
+    if not visible:
+        return ""
+    return "\n\n".join(
+        f"## {record.title}\n{record.body.strip()}"
+        for record in sorted(visible, key=lambda r: r.id)
+    )
 
 
 def room_id(campaign_id: str, npc_id: str) -> str:
@@ -33,11 +44,10 @@ def build_npc_prompt(
         sections.extend(("# Speaking style", npc.voice.style.strip()))
     if npc.memory.strip():
         sections.extend(("# NPC memory", npc.memory.strip()))
-    if campaign.lore:
-        lore = "\n\n".join(
-            f"## {lore_id}\n{body.strip()}" for lore_id, body in sorted(campaign.lore.items())
-        )
-        sections.extend(("# Campaign lore available to this NPC", lore))
+    if campaign.lore_records:
+        lore = _lore_for_npc(campaign.lore_records)
+        if lore:
+            sections.extend(("# Campaign lore available to this NPC", lore))
     if private_directions:
         directions = "\n".join(f"- {direction}" for direction in private_directions)
         sections.extend(
