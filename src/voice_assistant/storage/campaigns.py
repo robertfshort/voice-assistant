@@ -17,6 +17,7 @@ from voice_assistant.domain.models import (
     Secret,
     VoiceConfig,
 )
+from voice_assistant.storage.dictionary import load_campaign_dictionary
 from voice_assistant.storage.speakers import load_speakers
 
 _SECRET_HEADING = re.compile(r"^##\s+([a-z0-9][a-z0-9-]*)\s*$", re.MULTILINE)
@@ -241,6 +242,7 @@ def load_campaign(directory: Path) -> Campaign:
         lore=_load_text_directory(campaign_directory / "lore"),
         lore_records=_load_lore_records(campaign_directory / "lore"),
         scripts=_load_text_directory(campaign_directory / "scripts"),
+        dictionary=load_campaign_dictionary(campaign_directory),
     )
 
 

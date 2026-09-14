@@ -33,8 +33,9 @@ The early alpha build currently supports:
 - Conversation curation: Right-click a transcript line or selection to "Promote to lore" or "Promote to memory" for the active NPC
 - Lore metadata buttons: Insert YAML front matter (public, restricted, secret, gm-only, proposed) and `<!-- scope: ... -->` grouping comments from the Lore tab
 - In-document lore groupings: `<!-- scope: ... -->` HTML comments split a lore entry into sections, and only sections matching an NPC's affiliations are included in that NPC's prompt
+- Spell check: A "Spell check" button in the Lore tab highlights unknown words, shows suggestions, and lets the GM add names, places, and terms to a portable `campaign/dictionary.txt`
 
-The next roadmap step is the next feature from the **## Future feature notes** section, likely one of play session transcription with audio/speaker attribution, in-app spell check, or the Piper/local TTS provider plan.
+The next roadmap step is the next feature from the **## Future feature notes** section, likely one of play session audio transcription and speaker attribution, expanding spell check to NPC profiles and memories, or the Piper/local TTS provider plan.
 
 ## Product direction
 

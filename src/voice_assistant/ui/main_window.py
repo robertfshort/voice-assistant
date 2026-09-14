@@ -31,6 +31,7 @@ from PySide6.QtWidgets import (
 from voice_assistant.domain.models import Campaign, Npc, SpeakerProfile
 from voice_assistant.services.conversation import explain_npc_lore
 from voice_assistant.services.session_notes import SessionNotes, propose_session_notes
+from voice_assistant.services.spell_check import CampaignSpellCheck
 from voice_assistant.services.voice_preview import preview_voice, tts_segments
 from voice_assistant.services.voice_session import VoiceSessionController
 from voice_assistant.storage.campaigns import discover_campaigns, load_campaign
@@ -46,6 +47,7 @@ from voice_assistant.storage.npc_lore_proposals import (
 from voice_assistant.storage.speakers import create_speaker, save_speaker
 from voice_assistant.storage.transcripts import append_transcript, load_transcript
 from voice_assistant.ui.npc_dialog import NpcDialog
+from voice_assistant.ui.spell_check_dialog import SpellCheckDialog
 from voice_assistant.ui.themes import THEME_NAMES, apply_theme
 
 
@@ -247,9 +249,13 @@ class MainWindow(QMainWindow):
         self._save_lore_button = QPushButton("Save lore")
         self._save_lore_button.setEnabled(False)
         self._save_lore_button.clicked.connect(self._save_lore)
+        self._spell_check_button = QPushButton("Spell check")
+        self._spell_check_button.setEnabled(False)
+        self._spell_check_button.clicked.connect(self._spell_check_lore)
         lore_controls.addStretch()
         lore_controls.addWidget(self._new_lore_button)
         lore_controls.addWidget(self._save_lore_button)
+        lore_controls.addWidget(self._spell_check_button)
         lore_layout.addLayout(lore_controls)
         tabs.addTab(lore, "Lore")
 
@@ -324,7 +330,9 @@ class MainWindow(QMainWindow):
         self._lore_editor.clear()
         self._lore_editor.setEnabled(False)
         self._save_lore_button.setEnabled(False)
+        self._spell_check_button.setEnabled(False)
         self._new_lore_button.setEnabled(False)
+        self._spell_check_button.setEnabled(False)
         self._active_lore_id = None
         self._profile.clear()
         self._knowledge_editor.clear()
@@ -385,6 +393,7 @@ class MainWindow(QMainWindow):
         self._lore_editor.clear()
         self._lore_editor.setEnabled(False)
         self._save_lore_button.setEnabled(False)
+        self._spell_check_button.setEnabled(False)
         self._speaker_name.clear()
         self._speaker_name.setEnabled(False)
         self._speaker_active.setChecked(False)
@@ -888,6 +897,7 @@ class MainWindow(QMainWindow):
         self._lore_editor.setPlainText(self._active_campaign.lore[self._active_lore_id])
         self._lore_editor.setEnabled(True)
         self._save_lore_button.setEnabled(True)
+        self._spell_check_button.setEnabled(True)
 
     def _save_lore(self) -> None:
         if self._active_campaign is None or self._active_lore_id is None:
@@ -939,6 +949,23 @@ class MainWindow(QMainWindow):
         self._lore_editor.textCursor().insertText(f"<!-- scope: {scope} -->\n")
         self._lore_scope_input.clear()
         self._lore_editor.setFocus()
+
+    def _spell_check_lore(self) -> None:
+        if self._active_campaign is None:
+            return
+        text = self._lore_editor.toPlainText()
+        checker = CampaignSpellCheck(self._active_campaign.dictionary)
+        unknown = checker.unknown(text)
+        if not unknown:
+            QMessageBox.information(self, "Spell check", "No unknown words found.")
+            return
+        SpellCheckDialog(self._active_campaign.directory, unknown, checker, self).exec()
+        updated_campaign = load_campaign(self._active_campaign.directory)
+        campaign_index = self._campaigns.index(self._active_campaign)
+        campaigns = list(self._campaigns)
+        campaigns[campaign_index] = updated_campaign
+        self._campaigns = tuple(campaigns)
+        self._select_campaign(campaign_index)
 
     def _load_active_transcript(self) -> None:
         self._transcript.clear()

@@ -106,6 +106,7 @@ class Campaign(BaseModel):
     lore: dict[str, str] = Field(default_factory=dict)
     lore_records: dict[str, LoreRecord] = Field(default_factory=dict)
     scripts: dict[str, str] = Field(default_factory=dict)
+    dictionary: tuple[str, ...] = ()
 
     def npc(self, npc_id: str) -> Npc:
         for npc in self.npcs:
