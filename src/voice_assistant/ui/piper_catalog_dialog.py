@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QDialog,
     QHBoxLayout,
@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QMessageBox,
+    QProgressBar,
     QPushButton,
     QVBoxLayout,
     QWidget,
@@ -20,11 +21,14 @@ from PySide6.QtWidgets import (
 from voice_assistant.services.piper_catalog import (
     PiperCatalogVoice,
     download_piper_voice,
+    fetch_model_card,
     fetch_piper_catalog,
 )
 
 
 class PiperCatalogDialog(QDialog):
+    download_progress = Signal(int, int)
+
     def __init__(self, voice_root: Path, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._voice_root = voice_root
@@ -42,6 +46,10 @@ class PiperCatalogDialog(QDialog):
         self.details = QLabel("Loading Piper voice catalog…")
         self.details.setWordWrap(True)
         layout.addWidget(self.details)
+        self.progress = QProgressBar()
+        self.progress.setVisible(False)
+        layout.addWidget(self.progress)
+        self.download_progress.connect(self._update_progress)
         controls = QHBoxLayout()
         controls.addStretch()
         close_button = QPushButton("Close")
@@ -94,9 +102,21 @@ class PiperCatalogDialog(QDialog):
             f"{voice.language} — {voice.country or 'Unspecified country'}\n"
             f"Quality: {voice.quality}; speakers: {voice.speakers}; "
             f"download: {voice.size_mib:.1f} MiB\n"
-            "Source: Piper voices on Hugging Face. Review the upstream model card for licensing."
+            "License: loading upstream model card…"
         )
         self.download_button.setEnabled(True)
+        asyncio.create_task(self._load_model_card(voice))
+
+    async def _load_model_card(self, voice: PiperCatalogVoice) -> None:
+        try:
+            card = await fetch_model_card(voice)
+        except Exception as exc:
+            license_text = f"Unable to load model card: {exc}"
+        else:
+            license_text = card.license
+        if self._selected() == voice:
+            details = self.details.text().replace("loading upstream model card…", license_text)
+            self.details.setText(details)
 
     def _confirm_download(self) -> None:
         voice = self._selected()
@@ -111,11 +131,20 @@ class PiperCatalogDialog(QDialog):
             return
         self.download_button.setEnabled(False)
         self.download_button.setText("Downloading…")
+        self.progress.setRange(0, max(1, voice.size_bytes))
+        self.progress.setValue(0)
+        self.progress.setVisible(True)
         asyncio.create_task(self._download(voice))
+
+    def _update_progress(self, downloaded: int, total: int) -> None:
+        self.progress.setMaximum(max(1, total))
+        self.progress.setValue(downloaded)
 
     async def _download(self, voice: PiperCatalogVoice) -> None:
         try:
-            registered_name = await download_piper_voice(voice, self._voice_root)
+            registered_name = await download_piper_voice(
+                voice, self._voice_root, self.download_progress.emit
+            )
         except Exception as exc:
             QMessageBox.critical(self, "Piper download error", str(exc))
             self.download_button.setEnabled(True)
@@ -127,3 +156,4 @@ class PiperCatalogDialog(QDialog):
             )
         finally:
             self.download_button.setText("Download and register")
+            self.progress.setVisible(False)

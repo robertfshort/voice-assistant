@@ -96,14 +96,15 @@ Implemented in the first Piper pass:
 - Automatic PCM resampling to a selected device's supported default rate when it rejects Piper's native rate.
 - Per-NPC sentence-silence control stored in portable `voice.yaml`.
 - Searchable upstream Piper catalog with language, country, quality, speaker count, and download size.
-- Explicit confirmed downloads with MD5 integrity verification and automatic portable registry updates.
+- Explicit confirmed downloads with advertised-size and MD5 integrity verification, byte-level progress, and automatic portable registry updates.
+- Upstream model-card license details loaded for the selected voice before download.
 
 Remaining provider work:
 
 - Add a `system` provider (`pyttsx3` / `espeak`).
 - Optional expert overrides for explicit output sample rate and channels.
 - System TTS should ignore unsupported mood tags and speak the text.
-- Fetch and display upstream model-card license details before download when available.
+- Cache catalog/model-card metadata for offline browsing after the first successful refresh.
 - Add the same provider fallback and resampling behavior to every future conversation TTS path.
 
 ### Spell check

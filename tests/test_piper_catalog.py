@@ -27,6 +27,10 @@ def _catalog() -> dict[str, object]:
                     "size_bytes": 1024,
                     "md5_digest": "config-digest",
                 },
+                "en/en_US/test/medium/MODEL_CARD": {
+                    "size_bytes": 100,
+                    "md5_digest": "card-digest",
+                },
             },
         }
     }
@@ -42,6 +46,13 @@ def test_parse_catalog_extracts_download_metadata() -> None:
     assert voice.speakers == 2
     assert voice.size_bytes == 1049600
     assert voice.model_digest == "model-digest"
+    assert voice.model_card_path.endswith("MODEL_CARD")
+
+
+def test_parse_model_card_extracts_license() -> None:
+    card = piper_catalog.parse_model_card("## Dataset\n\n* License: CC-BY-4.0\n")
+
+    assert card.license == "CC-BY-4.0"
 
 
 def test_download_voice_verifies_then_registers_assets(
@@ -50,7 +61,12 @@ def test_download_voice_verifies_then_registers_assets(
     voice = piper_catalog.parse_catalog(_catalog())[0]
 
     def fake_download(
-        client: object, relative: str, target: Path, digest: str, expected_size: int
+        client: object,
+        relative: str,
+        target: Path,
+        digest: str,
+        expected_size: int,
+        progress: object,
     ) -> None:
         target.write_text(relative + digest, encoding="utf-8")
 
