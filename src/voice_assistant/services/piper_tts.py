@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from voice_assistant.domain.models import VoiceProviderConfig
+from voice_assistant.services.audio_devices import output_device_value
 from voice_assistant.storage.voices import resolve_registered_voice
 
 _VOICES: dict[tuple[Path, Path | None], Any] = {}
@@ -37,6 +38,9 @@ def _synthesize(
     voice_root: Path | None,
     text: str,
     mood: str,
+    output_device: str,
+    output_latency: str,
+    output_blocksize: int,
 ) -> None:
     registered = resolve_registered_voice(config.voice, voice_root)
     if registered is not None:
@@ -72,6 +76,9 @@ def _synthesize(
                     samplerate=chunk.sample_rate,
                     channels=chunk.sample_channels,
                     dtype="int16",
+                    device=output_device_value(output_device),
+                    latency=output_latency,
+                    blocksize=output_blocksize,
                 )
                 stream.start()
             stream.write(chunk.audio_int16_bytes)
@@ -88,5 +95,18 @@ async def speak_piper(
     mood: str = "",
     *,
     voice_root: Path | None = None,
+    output_device: str = "",
+    output_latency: str = "low",
+    output_blocksize: int = 0,
 ) -> None:
-    await asyncio.to_thread(_synthesize, config, base_directory, voice_root, text, mood)
+    await asyncio.to_thread(
+        _synthesize,
+        config,
+        base_directory,
+        voice_root,
+        text,
+        mood,
+        output_device,
+        output_latency,
+        output_blocksize,
+    )

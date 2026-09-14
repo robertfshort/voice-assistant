@@ -30,6 +30,9 @@ class SpeechSettings(BaseModel):
 
     voice_root: Path | None = None
     fallback_order: tuple[str, ...] = ("piper", "gemini")
+    output_device: str = ""
+    output_latency: str = "low"
+    output_blocksize: int = 0
 
 
 class AppearanceSettings(BaseModel):

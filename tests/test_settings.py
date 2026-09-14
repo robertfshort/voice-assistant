@@ -55,6 +55,9 @@ def test_settings_round_trip(tmp_path: Path) -> None:
         speech=SpeechSettings(
             voice_root=tmp_path / "voices",
             fallback_order=("piper", "gemini"),
+            output_device="Speakers",
+            output_latency="high",
+            output_blocksize=2048,
         ),
     )
 

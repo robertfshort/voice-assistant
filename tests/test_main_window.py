@@ -91,6 +91,9 @@ def test_duplicate_npc_creates_a_copy(
             voice_base_directory: str,
             voice_root: Path | None,
             default_voice_provider: str,
+            output_device: str,
+            output_latency: str,
+            output_blocksize: int,
         ) -> None:
             pass
 

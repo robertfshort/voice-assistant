@@ -80,6 +80,9 @@ def test_voice_preview_uses_current_voice_mood_and_style(
         base_directory: Path,
         api_key: str = "",
         voice_root: Path | None = None,
+        output_device: str = "",
+        output_latency: str = "low",
+        output_blocksize: int = 0,
     ) -> None:
         captured.update(
             voice=voice,

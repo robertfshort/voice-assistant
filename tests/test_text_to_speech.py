@@ -5,7 +5,14 @@ from pytest import MonkeyPatch
 
 from voice_assistant.domain.models import VoiceConfig, VoiceProviderConfig
 from voice_assistant.services import text_to_speech
+from voice_assistant.services.audio_devices import output_device_value
 from voice_assistant.services.piper_tts import resolve_voice_path
+
+
+def test_output_device_value_supports_stable_device_indexes() -> None:
+    assert output_device_value("") is None
+    assert output_device_value("3") == 3
+    assert output_device_value("Speakers") == "Speakers"
 
 
 def test_relative_piper_model_resolves_from_campaign_directory(tmp_path: Path) -> None:
@@ -27,6 +34,9 @@ def test_speak_text_routes_tagged_segments_to_piper(
         mood: str = "",
         *,
         voice_root: Path | None = None,
+        output_device: str = "",
+        output_latency: str = "low",
+        output_blocksize: int = 0,
     ) -> None:
         assert config.model == "voices/mara.onnx"
         assert base_directory == tmp_path

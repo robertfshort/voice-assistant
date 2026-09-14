@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import re
+import shutil
 from pathlib import Path
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from voice_assistant.domain.errors import ConfigurationError
+
+_VOICE_NAME = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 
 
 class PiperVoiceAsset(BaseModel):
@@ -34,12 +38,57 @@ def load_voice_registry(root: Path | None) -> VoiceRegistry:
         raise ConfigurationError(f"Unable to load voice registry from {path}: {exc}") from exc
 
 
+def import_piper_voice(root: Path, name: str, model: Path, config: Path | None) -> None:
+    if not _VOICE_NAME.fullmatch(name):
+        raise ConfigurationError("Voice name must use lowercase letters, numbers, and hyphens")
+    if model.suffix.lower() != ".onnx" or not model.is_file():
+        raise ConfigurationError(f"Piper model does not exist or is not an ONNX file: {model}")
+    if config is not None and (config.suffix.lower() != ".json" or not config.is_file()):
+        raise ConfigurationError(f"Piper config does not exist or is not JSON: {config}")
+    registry = load_voice_registry(root)
+    if name in registry.piper:
+        raise ConfigurationError(f"A voice named {name!r} is already registered")
+
+    target = root / "piper" / name
+    if target.exists():
+        raise ConfigurationError(f"Voice asset directory already exists: {target}")
+    try:
+        target.mkdir(parents=True)
+    except OSError as exc:
+        raise ConfigurationError(f"Unable to create voice asset directory: {exc}") from exc
+    model_target = target / model.name
+    config_target = target / config.name if config is not None else None
+    try:
+        shutil.copy2(model, model_target)
+        if config is not None and config_target is not None:
+            shutil.copy2(config, config_target)
+        voices = dict(registry.piper)
+        voices[name] = PiperVoiceAsset(
+            model=model_target.relative_to(root).as_posix(),
+            config=config_target.relative_to(root).as_posix() if config_target else "",
+        )
+        data = VoiceRegistry(piper=voices).model_dump(mode="json")
+        registry_path = root / "voices.yaml"
+        temporary = root / "voices.yaml.tmp"
+        temporary.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8", newline="\n")
+        temporary.replace(registry_path)
+    except OSError as exc:
+        shutil.rmtree(target, ignore_errors=True)
+        (root / "voices.yaml.tmp").unlink(missing_ok=True)
+        raise ConfigurationError(f"Unable to import Piper voice: {exc}") from exc
+
+
 def resolve_registered_voice(name: str, root: Path | None) -> tuple[Path, Path | None] | None:
     if not name or root is None:
         return None
     asset = load_voice_registry(root).piper.get(name)
     if asset is None:
         return None
-    model = (root / asset.model).resolve()
-    config = (root / asset.config).resolve() if asset.config else None
+    resolved_root = root.resolve()
+    model = (resolved_root / asset.model).resolve()
+    config = (resolved_root / asset.config).resolve() if asset.config else None
+    if not model.is_relative_to(resolved_root) or (
+        config is not None and not config.is_relative_to(resolved_root)
+    ):
+        raise ConfigurationError(f"Registered voice {name!r} points outside the voice folder")
     return model, config

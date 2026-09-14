@@ -1,6 +1,13 @@
 from pathlib import Path
 
-from voice_assistant.storage.voices import load_voice_registry, resolve_registered_voice
+import pytest
+
+from voice_assistant.domain.errors import ConfigurationError
+from voice_assistant.storage.voices import (
+    import_piper_voice,
+    load_voice_registry,
+    resolve_registered_voice,
+)
 
 
 def test_load_and_resolve_registered_piper_voice(tmp_path: Path) -> None:
@@ -18,6 +25,33 @@ def test_load_and_resolve_registered_piper_voice(tmp_path: Path) -> None:
         (tmp_path / "piper" / "innkeeper.onnx").resolve(),
         (tmp_path / "piper" / "innkeeper.onnx.json").resolve(),
     )
+
+
+def test_import_piper_voice_copies_assets_and_updates_registry(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    model = source / "mara.onnx"
+    config = source / "mara.onnx.json"
+    model.write_bytes(b"model")
+    config.write_text("{}", encoding="utf-8")
+    root = tmp_path / "voices"
+
+    import_piper_voice(root, "mara", model, config)
+
+    resolved = resolve_registered_voice("mara", root)
+    assert resolved is not None
+    assert resolved[0].read_bytes() == b"model"
+    assert resolved[1] is not None
+    assert resolved[1].read_text(encoding="utf-8") == "{}"
+
+
+def test_registered_voice_cannot_escape_voice_root(tmp_path: Path) -> None:
+    (tmp_path / "voices.yaml").write_text(
+        "piper:\n  unsafe:\n    model: ../outside.onnx\n", encoding="utf-8"
+    )
+
+    with pytest.raises(ConfigurationError, match="outside the voice folder"):
+        resolve_registered_voice("unsafe", tmp_path)
 
 
 def test_missing_voice_registry_is_empty(tmp_path: Path) -> None:

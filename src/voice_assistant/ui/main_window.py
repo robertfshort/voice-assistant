@@ -652,6 +652,9 @@ class MainWindow(QMainWindow):
             voice_base_directory=str(self._active_campaign.directory),
             voice_root=self._speech_settings.voice_root,
             default_voice_provider=self._providers.speech,
+            output_device=self._speech_settings.output_device,
+            output_latency=self._speech_settings.output_latency,
+            output_blocksize=self._speech_settings.output_blocksize,
         )
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
@@ -685,6 +688,9 @@ class MainWindow(QMainWindow):
             voice_base_directory=str(self._active_campaign.directory),
             voice_root=self._speech_settings.voice_root,
             default_voice_provider=self._providers.speech,
+            output_device=self._speech_settings.output_device,
+            output_latency=self._speech_settings.output_latency,
+            output_blocksize=self._speech_settings.output_blocksize,
         )
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
@@ -748,6 +754,9 @@ class MainWindow(QMainWindow):
             voice_base_directory=str(self._active_campaign.directory),
             voice_root=self._speech_settings.voice_root,
             default_voice_provider=self._providers.speech,
+            output_device=self._speech_settings.output_device,
+            output_latency=self._speech_settings.output_latency,
+            output_blocksize=self._speech_settings.output_blocksize,
         )
         dialog.setWindowTitle("Duplicate NPC")
         dialog.id_input.setEnabled(True)
@@ -1365,6 +1374,9 @@ class MainWindow(QMainWindow):
                 api_key=api_key,
                 voice_root=self._speech_settings.voice_root,
                 fallback_order=self._speech_settings.fallback_order,
+                output_device=self._speech_settings.output_device,
+                output_latency=self._speech_settings.output_latency,
+                output_blocksize=self._speech_settings.output_blocksize,
             )
         except Exception as exc:
             QMessageBox.critical(self, "TTS error", str(exc))

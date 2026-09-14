@@ -24,6 +24,9 @@ async def _speak_with_provider(
     base_directory: Path,
     voice_root: Path | None,
     api_key: str,
+    output_device: str,
+    output_latency: str,
+    output_blocksize: int,
 ) -> None:
     for mood, segment in tts_segments(text):
         if provider_name == "piper":
@@ -33,6 +36,9 @@ async def _speak_with_provider(
                 segment,
                 mood,
                 voice_root=voice_root,
+                output_device=output_device,
+                output_latency=output_latency,
+                output_blocksize=output_blocksize,
             )
         elif provider_name == "gemini":
             if not api_key:
@@ -63,6 +69,9 @@ async def speak_text(
     api_key: str = "",
     voice_root: Path | None = None,
     fallback_order: tuple[str, ...] = (),
+    output_device: str = "",
+    output_latency: str = "low",
+    output_blocksize: int = 0,
 ) -> str:
     providers = provider_order(voice, fallback_order)
     if not providers:
@@ -79,6 +88,9 @@ async def speak_text(
                 base_directory=base_directory,
                 voice_root=voice_root,
                 api_key=api_key,
+                output_device=output_device,
+                output_latency=output_latency,
+                output_blocksize=output_blocksize,
             )
         except Exception as exc:
             failures.append(f"{provider_name}: {exc}")

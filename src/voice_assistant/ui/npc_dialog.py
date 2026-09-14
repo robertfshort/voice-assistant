@@ -50,12 +50,18 @@ class NpcDialog(QDialog):
         voice_base_directory: str = ".",
         voice_root: Path | None = None,
         default_voice_provider: str = "gemini",
+        output_device: str = "",
+        output_latency: str = "low",
+        output_blocksize: int = 0,
     ) -> None:
         super().__init__(parent)
         self._credentials = credentials or CredentialStore()
         self._voice_base_directory = voice_base_directory
         self._voice_root = voice_root
         self._default_voice_provider = default_voice_provider
+        self._output_device = output_device
+        self._output_latency = output_latency
+        self._output_blocksize = output_blocksize
         self._pending_generations: dict[str, asyncio.Task[None]] = {}
         self._pending_expansion: asyncio.Task[None] | None = None
         self.setWindowTitle("Create NPC")
@@ -399,6 +405,9 @@ class NpcDialog(QDialog):
                 base_directory=Path(self._voice_base_directory),
                 api_key=api_key,
                 voice_root=self._voice_root,
+                output_device=self._output_device,
+                output_latency=self._output_latency,
+                output_blocksize=self._output_blocksize,
             )
         except Exception as exc:
             QMessageBox.critical(self, "Voice preview error", str(exc))
