@@ -64,7 +64,7 @@ class PiperCatalogDialog(QDialog):
 
     async def _load_catalog(self) -> None:
         try:
-            self._voices = await fetch_piper_catalog()
+            self._voices = await fetch_piper_catalog(self._voice_root / ".cache")
         except Exception as exc:
             self.details.setText(f"Unable to load Piper catalog: {exc}")
         else:
@@ -109,7 +109,7 @@ class PiperCatalogDialog(QDialog):
 
     async def _load_model_card(self, voice: PiperCatalogVoice) -> None:
         try:
-            card = await fetch_model_card(voice)
+            card = await fetch_model_card(voice, self._voice_root / ".cache")
         except Exception as exc:
             license_text = f"Unable to load model card: {exc}"
         else:

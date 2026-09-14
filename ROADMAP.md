@@ -98,13 +98,15 @@ Implemented in the first Piper pass:
 - Searchable upstream Piper catalog with language, country, quality, speaker count, and download size.
 - Explicit confirmed downloads with advertised-size and MD5 integrity verification, byte-level progress, and automatic portable registry updates.
 - Upstream model-card license details loaded for the selected voice before download.
+- Offline fallback caches for the last successful catalog and model-card responses.
+- Installed-voice browser with explicit confirmation before registry and asset removal.
 
 Remaining provider work:
 
 - Add a `system` provider (`pyttsx3` / `espeak`).
 - Optional expert overrides for explicit output sample rate and channels.
 - System TTS should ignore unsupported mood tags and speak the text.
-- Cache catalog/model-card metadata for offline browsing after the first successful refresh.
+- Add transactional voice updates/redownloads while retaining the last working model on failure.
 - Add the same provider fallback and resampling behavior to every future conversation TTS path.
 
 ### Spell check

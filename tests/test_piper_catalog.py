@@ -1,6 +1,10 @@
 import asyncio
+import hashlib
+import json
 from pathlib import Path
+from types import TracebackType
 
+import httpx
 from pytest import MonkeyPatch
 
 from voice_assistant.services import piper_catalog
@@ -36,6 +40,26 @@ def _catalog() -> dict[str, object]:
     }
 
 
+class _OfflineClient:
+    async def __aenter__(self) -> "_OfflineClient":
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        return None
+
+    async def get(self, url: str) -> object:
+        raise httpx.ConnectError("offline")
+
+
+def test_portable_voice_name_removes_unsafe_path_characters() -> None:
+    assert piper_catalog.portable_voice_name("../../en_US/test") == "en-us-test"
+
+
 def test_parse_catalog_extracts_download_metadata() -> None:
     voice = piper_catalog.parse_catalog(_catalog())[0]
 
@@ -47,6 +71,35 @@ def test_parse_catalog_extracts_download_metadata() -> None:
     assert voice.size_bytes == 1049600
     assert voice.model_digest == "model-digest"
     assert voice.model_card_path.endswith("MODEL_CARD")
+
+
+def test_catalog_uses_cached_metadata_when_offline(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    cache = tmp_path / "cache"
+    cache.mkdir()
+    (cache / "catalog.json").write_text(json.dumps(_catalog()), encoding="utf-8")
+    monkeypatch.setattr(piper_catalog.httpx, "AsyncClient", lambda **kwargs: _OfflineClient())
+
+    voices = asyncio.run(piper_catalog.fetch_piper_catalog(cache))
+
+    assert voices[0].key == "en_US-test-medium"
+
+
+def test_model_card_uses_cached_metadata_when_offline(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    voice = piper_catalog.parse_catalog(_catalog())[0]
+    cache = tmp_path / "cache"
+    model_cards = cache / "model-cards"
+    model_cards.mkdir(parents=True)
+    cache_name = hashlib.sha256(voice.key.encode("utf-8")).hexdigest() + ".md"
+    (model_cards / cache_name).write_text("* License: MIT\n", encoding="utf-8")
+    monkeypatch.setattr(piper_catalog.httpx, "AsyncClient", lambda **kwargs: _OfflineClient())
+
+    card = asyncio.run(piper_catalog.fetch_model_card(voice, cache))
+
+    assert card.license == "MIT"
 
 
 def test_parse_model_card_extracts_license() -> None:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 import re
 import tempfile
 from collections.abc import Callable
@@ -44,6 +45,14 @@ class PiperCatalogVoice:
 class PiperModelCard:
     text: str
     license: str = "Not specified"
+
+
+def portable_voice_name(key: str) -> str:
+    return re.sub(r"[^a-z0-9-]+", "-", key.lower()).strip("-")
+
+
+def _model_card_cache_name(key: str) -> str:
+    return hashlib.sha256(key.encode("utf-8")).hexdigest() + ".md"
 
 
 def parse_catalog(data: dict[str, Any]) -> tuple[PiperCatalogVoice, ...]:
@@ -90,21 +99,47 @@ def parse_model_card(text: str) -> PiperModelCard:
     return PiperModelCard(text=text, license=match.group(1).strip() if match else "Not specified")
 
 
-async def fetch_model_card(voice: PiperCatalogVoice) -> PiperModelCard:
+def _write_cache(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(content, encoding="utf-8")
+    temporary.replace(path)
+
+
+async def fetch_model_card(
+    voice: PiperCatalogVoice, cache_root: Path | None = None
+) -> PiperModelCard:
     if not voice.model_card_path:
         return PiperModelCard(text="", license="No model card provided")
+    cache = cache_root / "model-cards" / _model_card_cache_name(voice.key) if cache_root else None
     url = _FILE_URL.format(quote(voice.model_card_path, safe="/"))
-    async with httpx.AsyncClient(follow_redirects=True, timeout=30) as client:
-        response = await client.get(url)
-        response.raise_for_status()
-    return parse_model_card(response.text)
+    try:
+        async with httpx.AsyncClient(follow_redirects=True, timeout=30) as client:
+            response = await client.get(url)
+            response.raise_for_status()
+        text = response.text
+        if cache is not None:
+            _write_cache(cache, text)
+    except (httpx.HTTPError, OSError):
+        if cache is None or not cache.is_file():
+            raise
+        text = cache.read_text(encoding="utf-8")
+    return parse_model_card(text)
 
 
-async def fetch_piper_catalog() -> tuple[PiperCatalogVoice, ...]:
-    async with httpx.AsyncClient(follow_redirects=True, timeout=30) as client:
-        response = await client.get(_CATALOG_URL)
-        response.raise_for_status()
-        data = response.json()
+async def fetch_piper_catalog(cache_root: Path | None = None) -> tuple[PiperCatalogVoice, ...]:
+    cache = cache_root / "catalog.json" if cache_root else None
+    try:
+        async with httpx.AsyncClient(follow_redirects=True, timeout=30) as client:
+            response = await client.get(_CATALOG_URL)
+            response.raise_for_status()
+            data = response.json()
+        if cache is not None:
+            _write_cache(cache, json.dumps(data))
+    except (httpx.HTTPError, OSError):
+        if cache is None or not cache.is_file():
+            raise
+        data = json.loads(cache.read_text(encoding="utf-8"))
     if not isinstance(data, dict):
         raise ValueError("Piper voice catalog did not contain an object")
     return parse_catalog(data)
@@ -169,7 +204,7 @@ def _download_voice(
                 voice.config_size,
                 report,
             )
-        import_piper_voice(root, voice.key.lower().replace("_", "-"), model, config)
+        import_piper_voice(root, portable_voice_name(voice.key), model, config)
 
 
 async def download_piper_voice(
@@ -178,4 +213,4 @@ async def download_piper_voice(
     progress: Callable[[int, int], None] | None = None,
 ) -> str:
     await asyncio.to_thread(_download_voice, voice, root, progress)
-    return voice.key.lower().replace("_", "-")
+    return portable_voice_name(voice.key)

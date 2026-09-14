@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
 from voice_assistant.services.audio_devices import output_devices
 from voice_assistant.storage.settings import ProviderSettings, SpeechSettings
 from voice_assistant.storage.voices import import_piper_voice
+from voice_assistant.ui.installed_voices_dialog import InstalledVoicesDialog
 from voice_assistant.ui.piper_catalog_dialog import PiperCatalogDialog
 
 
@@ -77,8 +78,11 @@ class TtsSettingsDialog(QDialog):
         import_button.clicked.connect(self._import_piper_voice)
         download_button = QPushButton("Download Piper voice…")
         download_button.clicked.connect(self._download_piper_voice)
+        manage_button = QPushButton("Installed voices…")
+        manage_button.clicked.connect(self._manage_piper_voices)
         voice_buttons.addWidget(import_button)
         voice_buttons.addWidget(download_button)
+        voice_buttons.addWidget(manage_button)
         layout.addLayout(voice_buttons)
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Cancel | QDialogButtonBox.StandardButton.Save
@@ -86,6 +90,15 @@ class TtsSettingsDialog(QDialog):
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
+
+    def _manage_piper_voices(self) -> None:
+        root_text = self.voice_root_input.text().strip()
+        if not root_text:
+            QMessageBox.information(
+                self, "Shared voices folder required", "Choose a folder first."
+            )
+            return
+        InstalledVoicesDialog(Path(root_text), self).exec()
 
     def _download_piper_voice(self) -> None:
         root_text = self.voice_root_input.text().strip()

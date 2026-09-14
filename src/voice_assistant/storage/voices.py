@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import shutil
+from contextlib import suppress
 from pathlib import Path
 
 import yaml
@@ -38,6 +39,15 @@ def load_voice_registry(root: Path | None) -> VoiceRegistry:
         raise ConfigurationError(f"Unable to load voice registry from {path}: {exc}") from exc
 
 
+def _save_registry(root: Path, registry: VoiceRegistry) -> None:
+    root.mkdir(parents=True, exist_ok=True)
+    data = registry.model_dump(mode="json")
+    registry_path = root / "voices.yaml"
+    temporary = root / "voices.yaml.tmp"
+    temporary.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8", newline="\n")
+    temporary.replace(registry_path)
+
+
 def import_piper_voice(root: Path, name: str, model: Path, config: Path | None) -> None:
     if not _VOICE_NAME.fullmatch(name):
         raise ConfigurationError("Voice name must use lowercase letters, numbers, and hyphens")
@@ -67,15 +77,33 @@ def import_piper_voice(root: Path, name: str, model: Path, config: Path | None) 
             model=model_target.relative_to(root).as_posix(),
             config=config_target.relative_to(root).as_posix() if config_target else "",
         )
-        data = VoiceRegistry(piper=voices).model_dump(mode="json")
-        registry_path = root / "voices.yaml"
-        temporary = root / "voices.yaml.tmp"
-        temporary.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8", newline="\n")
-        temporary.replace(registry_path)
+        _save_registry(root, VoiceRegistry(piper=voices))
     except OSError as exc:
         shutil.rmtree(target, ignore_errors=True)
         (root / "voices.yaml.tmp").unlink(missing_ok=True)
         raise ConfigurationError(f"Unable to import Piper voice: {exc}") from exc
+
+
+def remove_piper_voice(root: Path, name: str) -> None:
+    registry = load_voice_registry(root)
+    if name not in registry.piper:
+        raise ConfigurationError(f"No registered Piper voice named {name!r}")
+    resolved = resolve_registered_voice(name, root)
+    if resolved is None:
+        raise ConfigurationError(f"Unable to resolve Piper voice {name!r}")
+    voices = dict(registry.piper)
+    del voices[name]
+    try:
+        _save_registry(root, VoiceRegistry(piper=voices))
+        model, config = resolved
+        model.unlink(missing_ok=True)
+        if config is not None:
+            config.unlink(missing_ok=True)
+        if model.parent != root.resolve():
+            with suppress(OSError):
+                model.parent.rmdir()
+    except OSError as exc:
+        raise ConfigurationError(f"Unable to remove Piper voice {name!r}: {exc}") from exc
 
 
 def resolve_registered_voice(name: str, root: Path | None) -> tuple[Path, Path | None] | None:
