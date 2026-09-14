@@ -24,8 +24,9 @@ The early alpha build currently supports:
 - NPC prompt filtering for public/restricted lore; secret and GM-only lore is hidden
 - NPC affiliations stored in profiles and used to filter restricted lore by scope
 - Explainable knowledge resolution: Inspect context dialog shows why each lore record was included for an NPC
+- Session summaries and proposed memory: Generate session notes from an NPC transcript, review the AI summary, and append proposed memory to the NPC with GM approval
 
-The next roadmap step is **Milestone 5 — Session tools**: optional session transcription, session summaries, and proposed NPC memory/lore updates requiring GM approval.
+The next roadmap step is **Milestone 5 — Session tools**: proposed lore updates derived from session transcripts requiring GM review, then PC/speaker profiles for multi-speaker context.
 
 ## Product direction
 

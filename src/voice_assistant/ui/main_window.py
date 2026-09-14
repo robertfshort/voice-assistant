@@ -28,6 +28,7 @@ from PySide6.QtWidgets import (
 
 from voice_assistant.domain.models import Campaign, Npc
 from voice_assistant.services.conversation import explain_npc_lore
+from voice_assistant.services.session_notes import SessionNotes, propose_session_notes
 from voice_assistant.services.voice_session import VoiceSessionController
 from voice_assistant.storage.campaigns import discover_campaigns, load_campaign
 from voice_assistant.storage.credentials import CredentialStore
@@ -153,12 +154,16 @@ class MainWindow(QMainWindow):
         self._inspect_button = QPushButton("Inspect context")
         self._inspect_button.setEnabled(False)
         self._inspect_button.clicked.connect(self._inspect_npc_context)
+        self._session_notes_button = QPushButton("Generate session notes")
+        self._session_notes_button.setEnabled(False)
+        self._session_notes_button.clicked.connect(self._on_generate_session_notes)
         controls.addWidget(self._start_button)
         controls.addWidget(provider_button)
         controls.addStretch()
         controls.addWidget(player_button)
         controls.addWidget(gm_button)
         controls.addWidget(self._inspect_button)
+        controls.addWidget(self._session_notes_button)
         conversation_layout.addLayout(controls)
         tabs.addTab(conversation, "NPC conversation")
 
@@ -508,6 +513,7 @@ class MainWindow(QMainWindow):
             self._append_knowledge_button.setEnabled(False)
             self._start_button.setEnabled(False)
             self._inspect_button.setEnabled(False)
+            self._session_notes_button.setEnabled(False)
             return
         self._npc_heading.setText(self._active_npc.name)
         self._knowledge_heading.setText(self._active_npc.name)
@@ -521,6 +527,7 @@ class MainWindow(QMainWindow):
         self._load_active_transcript()
         self._start_button.setEnabled(True)
         self._inspect_button.setEnabled(True)
+        self._session_notes_button.setEnabled(True)
 
     def _replace_active_npc_memory(self, memory: str) -> None:
         if self._active_campaign is None or self._active_npc is None:
@@ -751,6 +758,95 @@ class MainWindow(QMainWindow):
         layout.addWidget(close)
         dialog.resize(600, 400)
         dialog.exec()
+
+    def _on_generate_session_notes(self) -> None:
+        asyncio.create_task(self._generate_session_notes())
+
+    async def _generate_session_notes(self) -> None:
+        if self._active_campaign is None or self._active_npc is None:
+            return
+        try:
+            api_key = self._credentials.get_gemini_api_key()
+        except ValueError as exc:
+            QMessageBox.critical(self, "Credential error", str(exc))
+            return
+        if not api_key:
+            QMessageBox.information(
+                self,
+                "Gemini API key required",
+                "Store a Gemini API key from the main window before generating session notes.",
+            )
+            return
+        self._session_notes_button.setEnabled(False)
+        self._session_notes_button.setText("Summarizing…")
+        try:
+            entries = load_transcript(self._active_campaign.directory, self._active_npc.id)
+            notes = await propose_session_notes(api_key, entries)
+        except Exception as exc:
+            QMessageBox.critical(self, "Session notes error", str(exc))
+            return
+        finally:
+            self._session_notes_button.setEnabled(True)
+            self._session_notes_button.setText("Generate session notes")
+        self._show_session_notes_dialog(notes)
+
+    def _show_session_notes_dialog(self, notes: SessionNotes) -> None:
+        if self._active_campaign is None or self._active_npc is None:
+            return
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Session notes")
+        layout = QVBoxLayout(dialog)
+        layout.addWidget(QLabel("Summary"))
+        summary = QTextEdit()
+        summary.setReadOnly(True)
+        summary.setPlainText(notes.summary)
+        layout.addWidget(summary)
+        layout.addWidget(QLabel("Proposed memory"))
+        memory = QTextEdit()
+        memory.setReadOnly(True)
+        memory.setPlainText(notes.proposed_memory)
+        layout.addWidget(memory)
+        if notes.proposed_lore:
+            layout.addWidget(QLabel("Proposed lore"))
+            lore = QTextEdit()
+            lore.setReadOnly(True)
+            lore.setPlainText("\n".join(f"- {item}" for item in notes.proposed_lore))
+            layout.addWidget(lore)
+        buttons = QHBoxLayout()
+        append = QPushButton("Append memory to NPC")
+        append.clicked.connect(dialog.accept)
+        close = QPushButton("Close")
+        close.clicked.connect(dialog.reject)
+        buttons.addStretch()
+        buttons.addWidget(append)
+        buttons.addWidget(close)
+        layout.addLayout(buttons)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        if notes.proposed_memory:
+            try:
+                append_npc_knowledge(
+                    self._active_campaign.directory,
+                    self._active_npc.id,
+                    notes.proposed_memory,
+                    reason="Generated from session notes",
+                )
+            except ValueError as exc:
+                QMessageBox.critical(self, "Memory append error", str(exc))
+                return
+            updated_campaign = load_campaign(self._active_campaign.directory)
+            campaign_index = self._campaigns.index(self._active_campaign)
+            campaigns = list(self._campaigns)
+            campaigns[campaign_index] = updated_campaign
+            self._campaigns = tuple(campaigns)
+            self._select_campaign(campaign_index)
+            npc_row = next(
+                index
+                for index, npc in enumerate(updated_campaign.npcs)
+                if npc.id == self._active_npc.id
+            )
+            self._npc_list.setCurrentRow(npc_row)
+            self.statusBar().showMessage(f"Appended {len(notes.proposed_memory)} bytes to memory")
 
     def _configure_gemini_key(self) -> None:
         key, accepted = QInputDialog.getText(
