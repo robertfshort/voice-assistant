@@ -37,6 +37,19 @@ def output_sample_rate(device: str, source_rate: int, channels: int) -> int:
     return source_rate
 
 
+def convert_pcm16_channels(audio: bytes, source_channels: int, target_channels: int) -> bytes:
+    if not audio or source_channels == target_channels:
+        return audio
+    frames = np.frombuffer(audio, dtype=np.int16).reshape(-1, source_channels)
+    if target_channels == 1:
+        converted = np.rint(frames.astype(np.float64).mean(axis=1)).astype(np.int16)
+    elif source_channels == 1 and target_channels == 2:
+        converted = np.repeat(frames, 2, axis=1)
+    else:
+        raise ValueError(f"Unsupported channel conversion: {source_channels} to {target_channels}")
+    return converted.tobytes()
+
+
 def resample_pcm16(audio: bytes, source_rate: int, target_rate: int, channels: int) -> bytes:
     if not audio or source_rate == target_rate:
         return audio

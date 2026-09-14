@@ -23,7 +23,9 @@ from voice_assistant.services.piper_catalog import (
     download_piper_voice,
     fetch_model_card,
     fetch_piper_catalog,
+    portable_voice_name,
 )
+from voice_assistant.storage.voices import load_voice_registry
 
 
 class PiperCatalogDialog(QDialog):
@@ -122,10 +124,13 @@ class PiperCatalogDialog(QDialog):
         voice = self._selected()
         if voice is None:
             return
+        registered_name = portable_voice_name(voice.key)
+        replace = registered_name in load_voice_registry(self._voice_root).piper
+        action = "replace the installed copy" if replace else "register it locally"
         answer = QMessageBox.question(
             self,
-            "Download Piper voice?",
-            f"Download {voice.key} ({voice.size_mib:.1f} MiB) and register it locally?",
+            "Update Piper voice?" if replace else "Download Piper voice?",
+            f"Download {voice.key} ({voice.size_mib:.1f} MiB) and {action}?",
         )
         if answer != QMessageBox.StandardButton.Yes:
             return
@@ -134,16 +139,16 @@ class PiperCatalogDialog(QDialog):
         self.progress.setRange(0, max(1, voice.size_bytes))
         self.progress.setValue(0)
         self.progress.setVisible(True)
-        asyncio.create_task(self._download(voice))
+        asyncio.create_task(self._download(voice, replace=replace))
 
     def _update_progress(self, downloaded: int, total: int) -> None:
         self.progress.setMaximum(max(1, total))
         self.progress.setValue(downloaded)
 
-    async def _download(self, voice: PiperCatalogVoice) -> None:
+    async def _download(self, voice: PiperCatalogVoice, *, replace: bool = False) -> None:
         try:
             registered_name = await download_piper_voice(
-                voice, self._voice_root, self.download_progress.emit
+                voice, self._voice_root, self.download_progress.emit, replace=replace
             )
         except Exception as exc:
             QMessageBox.critical(self, "Piper download error", str(exc))

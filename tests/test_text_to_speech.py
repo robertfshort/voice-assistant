@@ -5,7 +5,11 @@ from pytest import MonkeyPatch
 
 from voice_assistant.domain.models import VoiceConfig, VoiceProviderConfig
 from voice_assistant.services import text_to_speech
-from voice_assistant.services.audio_devices import output_device_value, resample_pcm16
+from voice_assistant.services.audio_devices import (
+    convert_pcm16_channels,
+    output_device_value,
+    resample_pcm16,
+)
 from voice_assistant.services.piper_tts import resolve_voice_path
 
 
@@ -13,6 +17,12 @@ def test_output_device_value_supports_stable_device_indexes() -> None:
     assert output_device_value("") is None
     assert output_device_value("3") == 3
     assert output_device_value("Speakers") == "Speakers"
+
+
+def test_convert_pcm16_channels_duplicates_mono_to_stereo() -> None:
+    source = b"\xe8\x03\xd0\x07"
+
+    assert convert_pcm16_channels(source, 1, 2) == (b"\xe8\x03\xe8\x03\xd0\x07\xd0\x07")
 
 
 def test_resample_pcm16_changes_frame_count_and_preserves_channels() -> None:

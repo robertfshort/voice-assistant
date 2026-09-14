@@ -7,13 +7,14 @@ from typing import Any
 
 from voice_assistant.domain.models import VoiceProviderConfig
 from voice_assistant.services.audio_devices import (
+    convert_pcm16_channels,
     output_device_value,
     output_sample_rate,
     resample_pcm16,
 )
 from voice_assistant.storage.voices import resolve_registered_voice
 
-_VOICES: dict[tuple[Path, Path | None], Any] = {}
+_VOICES: dict[tuple[Path, int, Path | None, int], Any] = {}
 _MOOD_OVERRIDES = {
     "whisper": (1.15, 0.45),
     "nervously": (0.92, 0.8),
@@ -29,8 +30,16 @@ def resolve_voice_path(path: str, base_directory: Path) -> Path:
 
 
 def _load_voice(model: Path, config: Path | None) -> Any:
-    key = (model, config)
+    key = (
+        model,
+        model.stat().st_mtime_ns,
+        config,
+        config.stat().st_mtime_ns if config is not None else 0,
+    )
     if key not in _VOICES:
+        for cached in tuple(_VOICES):
+            if cached[0] == model and cached != key:
+                del _VOICES[cached]
         piper = importlib.import_module("piper")
         _VOICES[key] = piper.PiperVoice.load(model, config_path=config)
     return _VOICES[key]
@@ -75,30 +84,30 @@ def _synthesize(
     stream = None
     try:
         for chunk in voice.synthesize(text, syn_config=synthesis):
-            target_rate = output_sample_rate(
-                output_device, chunk.sample_rate, chunk.sample_channels
+            target_channels = config.channels or chunk.sample_channels
+            target_rate = config.sample_rate or output_sample_rate(
+                output_device, chunk.sample_rate, target_channels
             )
             if stream is None:
                 stream = sounddevice.RawOutputStream(
                     samplerate=target_rate,
-                    channels=chunk.sample_channels,
+                    channels=target_channels,
                     dtype="int16",
                     device=output_device_value(output_device),
                     latency=output_latency,
                     blocksize=output_blocksize,
                 )
                 stream.start()
-            stream.write(
-                resample_pcm16(
-                    chunk.audio_int16_bytes,
-                    chunk.sample_rate,
-                    target_rate,
-                    chunk.sample_channels,
-                )
+            audio = resample_pcm16(
+                chunk.audio_int16_bytes,
+                chunk.sample_rate,
+                target_rate,
+                chunk.sample_channels,
             )
+            stream.write(convert_pcm16_channels(audio, chunk.sample_channels, target_channels))
             silence_frames = round(config.sentence_silence * target_rate)
             if silence_frames > 0:
-                stream.write(bytes(silence_frames * chunk.sample_channels * 2))
+                stream.write(bytes(silence_frames * target_channels * 2))
     finally:
         if stream is not None:
             stream.stop()

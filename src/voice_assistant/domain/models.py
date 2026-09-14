@@ -26,6 +26,8 @@ class VoiceProviderConfig(BaseModel):
     noise_scale: float = 0.667
     noise_w: float = 0.8
     sentence_silence: float = 0.0
+    sample_rate: int = 0
+    channels: int = 0
 
 
 class VoiceConfig(BaseModel):

@@ -38,6 +38,8 @@ def _draft(npc_id: str = "guildmaster-vale") -> NpcDraft:
         piper_config="voices/vale.onnx.json",
         piper_speaker_id=2,
         piper_sentence_silence=0.25,
+        piper_sample_rate=48000,
+        piper_channels=2,
     )
 
 
@@ -63,6 +65,8 @@ def test_create_npc_writes_a_loadable_portable_character(tmp_path: Path) -> None
     assert npc.voice.providers["piper"].model == "voices/vale.onnx"
     assert npc.voice.providers["piper"].speaker_id == 2
     assert npc.voice.providers["piper"].sentence_silence == 0.25
+    assert npc.voice.providers["piper"].sample_rate == 48000
+    assert npc.voice.providers["piper"].channels == 2
     assert npc.secrets == ()
 
 
@@ -112,6 +116,8 @@ def test_draft_from_npc_reads_editable_profile_fields(tmp_path: Path) -> None:
     assert draft.piper_model == "voices/vale.onnx"
     assert draft.piper_speaker_id == 2
     assert draft.piper_sentence_silence == 0.25
+    assert draft.piper_sample_rate == 48000
+    assert draft.piper_channels == 2
 
 
 def test_create_npc_copies_portrait_image(tmp_path: Path) -> None:

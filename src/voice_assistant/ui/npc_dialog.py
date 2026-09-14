@@ -138,6 +138,13 @@ class NpcDialog(QDialog):
         self.piper_silence_input.setRange(0.0, 5.0)
         self.piper_silence_input.setSingleStep(0.1)
         self.piper_silence_input.setSuffix(" seconds")
+        self.piper_sample_rate_input = QSpinBox()
+        self.piper_sample_rate_input.setRange(0, 192000)
+        self.piper_sample_rate_input.setSpecialValueText("Automatic")
+        self.piper_sample_rate_input.setSingleStep(1000)
+        self.piper_channels_input = QSpinBox()
+        self.piper_channels_input.setRange(0, 2)
+        self.piper_channels_input.setSpecialValueText("Automatic")
 
         form.addRow("Name", self._field_with_ai(self.name_input, "name"))
         form.addRow("Stable ID", self.id_input)
@@ -175,6 +182,8 @@ class NpcDialog(QDialog):
         form.addRow("Piper noise scale", self.piper_noise_input)
         form.addRow("Piper noise width", self.piper_noise_w_input)
         form.addRow("Piper sentence silence", self.piper_silence_input)
+        form.addRow("Piper output rate", self.piper_sample_rate_input)
+        form.addRow("Piper output channels", self.piper_channels_input)
 
         self.portrait_input = QLineEdit()
         self.portrait_input.setReadOnly(True)
@@ -246,6 +255,8 @@ class NpcDialog(QDialog):
         self.piper_noise_input.setValue(draft.piper_noise_scale)
         self.piper_noise_w_input.setValue(draft.piper_noise_w)
         self.piper_silence_input.setValue(draft.piper_sentence_silence)
+        self.piper_sample_rate_input.setValue(draft.piper_sample_rate)
+        self.piper_channels_input.setValue(draft.piper_channels)
         if draft.portrait:
             self.portrait_input.setText(draft.portrait)
             self._load_portrait_preview(draft.portrait)
@@ -396,6 +407,8 @@ class NpcDialog(QDialog):
                 noise_scale=self.piper_noise_input.value(),
                 noise_w=self.piper_noise_w_input.value(),
                 sentence_silence=self.piper_silence_input.value(),
+                sample_rate=self.piper_sample_rate_input.value(),
+                channels=self.piper_channels_input.value(),
             )
             voice = VoiceConfig(
                 style=self.style_input.currentText().strip(),
@@ -577,6 +590,8 @@ class NpcDialog(QDialog):
             piper_noise_scale=self.piper_noise_input.value(),
             piper_noise_w=self.piper_noise_w_input.value(),
             piper_sentence_silence=self.piper_silence_input.value(),
+            piper_sample_rate=self.piper_sample_rate_input.value(),
+            piper_channels=self.piper_channels_input.value(),
             portrait=self.portrait_input.text().strip() or None,
             archived=self.archived_input.isChecked(),
         )

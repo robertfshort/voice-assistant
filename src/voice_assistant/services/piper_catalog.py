@@ -13,7 +13,7 @@ from urllib.parse import quote
 
 import httpx
 
-from voice_assistant.storage.voices import import_piper_voice
+from voice_assistant.storage.voices import import_piper_voice, replace_piper_voice
 
 _CATALOG_URL = "https://huggingface.co/rhasspy/piper-voices/resolve/main/voices.json"
 _FILE_URL = "https://huggingface.co/rhasspy/piper-voices/resolve/main/{}"
@@ -179,6 +179,7 @@ def _download_voice(
     voice: PiperCatalogVoice,
     root: Path,
     progress: Callable[[int, int], None] | None,
+    replace: bool,
 ) -> None:
     downloaded = 0
 
@@ -204,13 +205,19 @@ def _download_voice(
                 voice.config_size,
                 report,
             )
-        import_piper_voice(root, portable_voice_name(voice.key), model, config)
+        name = portable_voice_name(voice.key)
+        if replace:
+            replace_piper_voice(root, name, model, config)
+        else:
+            import_piper_voice(root, name, model, config)
 
 
 async def download_piper_voice(
     voice: PiperCatalogVoice,
     root: Path,
     progress: Callable[[int, int], None] | None = None,
+    *,
+    replace: bool = False,
 ) -> str:
-    await asyncio.to_thread(_download_voice, voice, root, progress)
+    await asyncio.to_thread(_download_voice, voice, root, progress, replace)
     return portable_voice_name(voice.key)

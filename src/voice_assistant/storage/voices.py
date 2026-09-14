@@ -84,6 +84,47 @@ def import_piper_voice(root: Path, name: str, model: Path, config: Path | None) 
         raise ConfigurationError(f"Unable to import Piper voice: {exc}") from exc
 
 
+def replace_piper_voice(root: Path, name: str, model: Path, config: Path | None) -> None:
+    if model.suffix.lower() != ".onnx" or not model.is_file():
+        raise ConfigurationError(f"Piper model does not exist or is not an ONNX file: {model}")
+    if config is not None and (config.suffix.lower() != ".json" or not config.is_file()):
+        raise ConfigurationError(f"Piper config does not exist or is not JSON: {config}")
+    registry = load_voice_registry(root)
+    if name not in registry.piper:
+        raise ConfigurationError(f"No registered Piper voice named {name!r}")
+    target = root / "piper" / name
+    staging = target.parent / f".{name}.update"
+    backup = target.parent / f".{name}.backup"
+    if staging.exists() or backup.exists():
+        raise ConfigurationError(f"A previous update for {name!r} requires manual cleanup")
+    staging.mkdir(parents=True)
+    model_target = staging / model.name
+    config_target = staging / config.name if config is not None else None
+    replaced = False
+    try:
+        shutil.copy2(model, model_target)
+        if config is not None and config_target is not None:
+            shutil.copy2(config, config_target)
+        target.rename(backup)
+        staging.rename(target)
+        replaced = True
+        voices = dict(registry.piper)
+        voices[name] = PiperVoiceAsset(
+            model=(target / model.name).relative_to(root).as_posix(),
+            config=(target / config.name).relative_to(root).as_posix() if config else "",
+        )
+        _save_registry(root, VoiceRegistry(piper=voices))
+    except OSError as exc:
+        if replaced:
+            with suppress(OSError):
+                target.rename(staging)
+                backup.rename(target)
+        shutil.rmtree(staging, ignore_errors=True)
+        raise ConfigurationError(f"Unable to update Piper voice {name!r}: {exc}") from exc
+    with suppress(OSError):
+        shutil.rmtree(backup)
+
+
 def remove_piper_voice(root: Path, name: str) -> None:
     registry = load_voice_registry(root)
     if name not in registry.piper:

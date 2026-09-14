@@ -100,13 +100,14 @@ Implemented in the first Piper pass:
 - Upstream model-card license details loaded for the selected voice before download.
 - Offline fallback caches for the last successful catalog and model-card responses.
 - Installed-voice browser with explicit confirmation before registry and asset removal.
+- Transactional catalog redownloads that retain the installed model if replacement fails.
+- Optional per-NPC output sample-rate and mono/stereo overrides with PCM channel conversion.
+- Updated model files invalidate the in-memory Piper cache automatically.
 
-Remaining provider work:
+The planned Piper implementation is complete. Remaining provider-neutral work:
 
 - Add a `system` provider (`pyttsx3` / `espeak`).
-- Optional expert overrides for explicit output sample rate and channels.
 - System TTS should ignore unsupported mood tags and speak the text.
-- Add transactional voice updates/redownloads while retaining the last working model on failure.
 - Add the same provider fallback and resampling behavior to every future conversation TTS path.
 
 ### Spell check
