@@ -30,6 +30,7 @@ from PySide6.QtWidgets import (
 from voice_assistant.domain.models import Campaign, Npc, SpeakerProfile
 from voice_assistant.services.conversation import explain_npc_lore
 from voice_assistant.services.session_notes import SessionNotes, propose_session_notes
+from voice_assistant.services.voice_preview import preview_voice
 from voice_assistant.services.voice_session import VoiceSessionController
 from voice_assistant.storage.campaigns import discover_campaigns, load_campaign
 from voice_assistant.storage.credentials import CredentialStore
@@ -160,6 +161,9 @@ class MainWindow(QMainWindow):
         self._session_notes_button = QPushButton("Generate session notes")
         self._session_notes_button.setEnabled(False)
         self._session_notes_button.clicked.connect(self._on_generate_session_notes)
+        self._speak_as_npc_button = QPushButton("Speak as NPC")
+        self._speak_as_npc_button.setEnabled(False)
+        self._speak_as_npc_button.clicked.connect(self._on_speak_as_npc)
         controls.addWidget(self._start_button)
         controls.addWidget(provider_button)
         controls.addStretch()
@@ -167,6 +171,7 @@ class MainWindow(QMainWindow):
         controls.addWidget(gm_button)
         controls.addWidget(self._inspect_button)
         controls.addWidget(self._session_notes_button)
+        controls.addWidget(self._speak_as_npc_button)
         conversation_layout.addLayout(controls)
         tabs.addTab(conversation, "NPC conversation")
 
@@ -664,6 +669,7 @@ class MainWindow(QMainWindow):
             self._start_button.setEnabled(False)
             self._inspect_button.setEnabled(False)
             self._session_notes_button.setEnabled(False)
+            self._speak_as_npc_button.setEnabled(False)
             return
         self._npc_heading.setText(self._active_npc.name)
         self._knowledge_heading.setText(self._active_npc.name)
@@ -678,6 +684,7 @@ class MainWindow(QMainWindow):
         self._start_button.setEnabled(True)
         self._inspect_button.setEnabled(True)
         self._session_notes_button.setEnabled(True)
+        self._speak_as_npc_button.setEnabled("gemini" in self._active_npc.voice.providers)
 
     def _replace_active_npc_memory(self, memory: str) -> None:
         if self._active_campaign is None or self._active_npc is None:
@@ -884,6 +891,57 @@ class MainWindow(QMainWindow):
             asyncio.create_task(
                 self._voice_session.send_gm_instruction(text, request_response=request_response)
             )
+
+    def _on_speak_as_npc(self) -> None:
+        if self._active_npc is None:
+            return
+        try:
+            api_key = self._credentials.get_gemini_api_key()
+        except ValueError as exc:
+            QMessageBox.critical(self, "Credential error", str(exc))
+            return
+        if not api_key:
+            QMessageBox.information(
+                self,
+                "Gemini API key required",
+                "Store a Gemini API key before using text-to-speech.",
+            )
+            return
+        gemini = self._active_npc.voice.providers.get("gemini")
+        if gemini is None:
+            QMessageBox.information(
+                self,
+                "No Gemini voice",
+                "This NPC has no Gemini voice configured. Edit the NPC and choose a voice.",
+            )
+            return
+        text, accepted = QInputDialog.getMultiLineText(
+            self,
+            "Speak as NPC",
+            f"Text to speak in {self._active_npc.name}'s voice:",
+        )
+        if not accepted or not text.strip():
+            return
+        self._speak_as_npc_button.setEnabled(False)
+        self._speak_as_npc_button.setText("Speaking…")
+        asyncio.create_task(self._speak_as_npc_text(api_key, gemini.voice, text.strip()))
+
+    async def _speak_as_npc_text(self, api_key: str, voice: str, text: str) -> None:
+        try:
+            if self._active_npc is None:
+                return
+            await preview_voice(
+                api_key,
+                voice,
+                "",
+                self._active_npc.voice.style,
+                text=text,
+            )
+        except Exception as exc:
+            QMessageBox.critical(self, "TTS error", str(exc))
+        finally:
+            self._speak_as_npc_button.setEnabled(True)
+            self._speak_as_npc_button.setText("Speak as NPC")
 
     def _inspect_npc_context(self) -> None:
         if self._active_campaign is None or self._active_npc is None:
