@@ -185,13 +185,12 @@ def load_campaign(directory: Path) -> Campaign:
         raise CampaignError(
             f"Default NPC {manifest.default_npc!r} does not exist in {characters_directory}"
         )
-    lore_records = _load_lore_records(campaign_directory / "lore")
     return Campaign(
         manifest=manifest,
         directory=campaign_directory,
         npcs=npcs,
-        lore={id: record.body for id, record in lore_records.items()},
-        lore_records=lore_records,
+        lore=_load_text_directory(campaign_directory / "lore"),
+        lore_records=_load_lore_records(campaign_directory / "lore"),
         scripts=_load_text_directory(campaign_directory / "scripts"),
     )
 
