@@ -46,20 +46,32 @@ from voice_assistant.storage.npc_lore_proposals import (
     render_lore_file,
     save_lore_proposal,
 )
+from voice_assistant.storage.settings import ProviderSettings, SpeechSettings
 from voice_assistant.storage.speakers import create_speaker, save_speaker
 from voice_assistant.storage.transcripts import append_transcript, load_transcript
 from voice_assistant.ui.npc_dialog import NpcDialog
 from voice_assistant.ui.spell_check_dialog import SpellCheckDialog
 from voice_assistant.ui.themes import THEME_NAMES, apply_theme
+from voice_assistant.ui.tts_settings_dialog import TtsSettingsDialog
 
 
 class MainWindow(QMainWindow):
     campaign_root_changed = Signal(Path)
     theme_changed = Signal(str)
+    tts_settings_changed = Signal(object, object)
 
-    def __init__(self, campaign_root: Path, *, theme: str = "light") -> None:
+    def __init__(
+        self,
+        campaign_root: Path,
+        *,
+        theme: str = "light",
+        providers: ProviderSettings | None = None,
+        speech: SpeechSettings | None = None,
+    ) -> None:
         super().__init__()
         self._campaign_root = campaign_root
+        self._providers = providers or ProviderSettings()
+        self._speech_settings = speech or SpeechSettings()
         self._campaigns: tuple[Campaign, ...] = ()
         self._active_campaign: Campaign | None = None
         self._active_npc: Npc | None = None
@@ -165,6 +177,8 @@ class MainWindow(QMainWindow):
         self._start_button.clicked.connect(self._toggle_voice_session)
         provider_button = QPushButton("Gemini API key")
         provider_button.clicked.connect(self._configure_gemini_key)
+        tts_settings_button = QPushButton("TTS settings")
+        tts_settings_button.clicked.connect(self._configure_tts)
         player_button = QPushButton("Send player text")
         player_button.clicked.connect(self._send_player_text)
         gm_button = QPushButton("Send private GM instruction")
@@ -183,6 +197,7 @@ class MainWindow(QMainWindow):
         self._record_button.clicked.connect(self._toggle_session_recording)
         controls.addWidget(self._start_button)
         controls.addWidget(provider_button)
+        controls.addWidget(tts_settings_button)
         controls.addStretch()
         controls.addWidget(player_button)
         controls.addWidget(gm_button)
@@ -635,6 +650,8 @@ class MainWindow(QMainWindow):
             self,
             credentials=self._credentials,
             voice_base_directory=str(self._active_campaign.directory),
+            voice_root=self._speech_settings.voice_root,
+            default_voice_provider=self._providers.speech,
         )
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
@@ -666,6 +683,8 @@ class MainWindow(QMainWindow):
             credentials=self._credentials,
             draft=draft_from_npc(self._active_npc),
             voice_base_directory=str(self._active_campaign.directory),
+            voice_root=self._speech_settings.voice_root,
+            default_voice_provider=self._providers.speech,
         )
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
@@ -727,6 +746,8 @@ class MainWindow(QMainWindow):
             credentials=self._credentials,
             draft=template,
             voice_base_directory=str(self._active_campaign.directory),
+            voice_root=self._speech_settings.voice_root,
+            default_voice_provider=self._providers.speech,
         )
         dialog.setWindowTitle("Duplicate NPC")
         dialog.id_input.setEnabled(True)
@@ -1316,10 +1337,10 @@ class MainWindow(QMainWindow):
         if self._active_npc is None:
             return
         api_key = ""
-        if self._active_npc.voice.preferred_provider == "gemini":
-            try:
-                api_key = self._credentials.get_gemini_api_key() or ""
-            except ValueError as exc:
+        try:
+            api_key = self._credentials.get_gemini_api_key() or ""
+        except ValueError as exc:
+            if self._active_npc.voice.preferred_provider == "gemini":
                 QMessageBox.critical(self, "Credential error", str(exc))
                 return
         text, accepted = QInputDialog.getMultiLineText(
@@ -1342,6 +1363,8 @@ class MainWindow(QMainWindow):
                 text,
                 base_directory=self._active_campaign.directory,
                 api_key=api_key,
+                voice_root=self._speech_settings.voice_root,
+                fallback_order=self._speech_settings.fallback_order,
             )
         except Exception as exc:
             QMessageBox.critical(self, "TTS error", str(exc))
@@ -1506,6 +1529,16 @@ class MainWindow(QMainWindow):
             )
         else:
             self.statusBar().showMessage(f"Created session lore: {lore_id}")
+
+    def _configure_tts(self) -> None:
+        dialog = TtsSettingsDialog(self._providers, self._speech_settings, self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        provider, speech = dialog.values()
+        self._providers = self._providers.model_copy(update={"speech": provider})
+        self._speech_settings = speech
+        self.tts_settings_changed.emit(self._providers, speech)
+        self.statusBar().showMessage("Text-to-speech settings saved")
 
     def _configure_gemini_key(self) -> None:
         key, accepted = QInputDialog.getText(

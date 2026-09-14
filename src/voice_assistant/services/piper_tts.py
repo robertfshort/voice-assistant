@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from voice_assistant.domain.models import VoiceProviderConfig
+from voice_assistant.storage.voices import resolve_registered_voice
 
 _VOICES: dict[tuple[Path, Path | None], Any] = {}
 _MOOD_OVERRIDES = {
@@ -30,11 +31,22 @@ def _load_voice(model: Path, config: Path | None) -> Any:
     return _VOICES[key]
 
 
-def _synthesize(config: VoiceProviderConfig, base_directory: Path, text: str, mood: str) -> None:
-    if not config.model:
-        raise ValueError("No Piper model is configured for this NPC")
-    model = resolve_voice_path(config.model, base_directory)
-    config_path = resolve_voice_path(config.config, base_directory) if config.config else None
+def _synthesize(
+    config: VoiceProviderConfig,
+    base_directory: Path,
+    voice_root: Path | None,
+    text: str,
+    mood: str,
+) -> None:
+    registered = resolve_registered_voice(config.voice, voice_root)
+    if registered is not None:
+        model, config_path = registered
+    elif config.model:
+        model = resolve_voice_path(config.model, base_directory)
+        config_path = resolve_voice_path(config.config, base_directory) if config.config else None
+    else:
+        name = f" named {config.voice!r}" if config.voice else ""
+        raise ValueError(f"No Piper model is configured{name}")
     if not model.is_file():
         raise FileNotFoundError(f"Piper model not found: {model}")
     if config_path is not None and not config_path.is_file():
@@ -70,6 +82,11 @@ def _synthesize(config: VoiceProviderConfig, base_directory: Path, text: str, mo
 
 
 async def speak_piper(
-    config: VoiceProviderConfig, base_directory: Path, text: str, mood: str = ""
+    config: VoiceProviderConfig,
+    base_directory: Path,
+    text: str,
+    mood: str = "",
+    *,
+    voice_root: Path | None = None,
 ) -> None:
-    await asyncio.to_thread(_synthesize, config, base_directory, text, mood)
+    await asyncio.to_thread(_synthesize, config, base_directory, voice_root, text, mood)

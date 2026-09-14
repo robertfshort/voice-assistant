@@ -88,10 +88,12 @@ Implemented in the first Piper pass:
 - Cached local Piper models with streaming playback through `sounddevice`.
 - Piper model/config selection, multi-speaker ID, length scale, noise scale, and noise width in the NPC editor.
 - Provider-specific `[[whisper]]`, `[[nervously]]`, and `[[shout]]` synthesis overrides.
+- Global default provider, shared voice-folder, and fallback-order settings from the main window.
+- Named Piper voices from a shared `voices.yaml` registry, allowing NPC files to reference assets without absolute paths.
+- Ordered Piper/Gemini fallback with failures logged and surfaced if every configured provider fails.
 
 Remaining provider work:
 
-- Add a global default TTS provider in `AppSettings.providers`; NPC-specific selection currently takes precedence.
 - Add a `system` provider (`pyttsx3` / `espeak`).
 - Additional Piper settings for sentence silence and explicit sample-rate/channel overrides.
 - Audio output settings:
@@ -99,10 +101,7 @@ Remaining provider work:
   - Resampling from the provider sample rate to the selected device rate.
   - Buffer size and latency for `sounddevice`.
 - System TTS should ignore unsupported mood tags and speak the text.
-- Provider fallback chain: if the selected provider fails (quota, missing model, no API key), try the next configured provider and record the fallback in the log.
-- Centralised voice/voices asset directory:
-  - `voices/` for `.onnx` / `.json` Piper models and a `voices.yaml` registry that maps voice names to provider-specific files.
-  - Let campaigns reference a voice by name instead of by absolute path, keeping campaigns portable.
+- Voice model discovery/download UI with license, language, quality, size, and checksum metadata.
 - Add the same provider fallback and resampling behavior to every future conversation TTS path.
 
 ### Spell check

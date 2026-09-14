@@ -2,6 +2,8 @@ from pathlib import Path
 
 from voice_assistant.storage.settings import (
     AppSettings,
+    ProviderSettings,
+    SpeechSettings,
     StorageSettings,
     load_settings,
     resolve_campaign_root,
@@ -47,7 +49,14 @@ def test_default_campaign_root_uses_user_data_directory(tmp_path: Path) -> None:
 
 def test_settings_round_trip(tmp_path: Path) -> None:
     path = tmp_path / "config.yaml"
-    settings = AppSettings(storage=StorageSettings(campaign_root=tmp_path / "campaigns"))
+    settings = AppSettings(
+        storage=StorageSettings(campaign_root=tmp_path / "campaigns"),
+        providers=ProviderSettings(speech="piper"),
+        speech=SpeechSettings(
+            voice_root=tmp_path / "voices",
+            fallback_order=("piper", "gemini"),
+        ),
+    )
 
     saved_path = save_settings(settings, path)
 

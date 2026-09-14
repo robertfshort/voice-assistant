@@ -53,6 +53,7 @@ class NpcDraft(BaseModel):
     speaking_style: str = "natural"
     preferred_voice_provider: str = "gemini"
     gemini_voice: str = "Aoede"
+    piper_voice: str = ""
     piper_model: str = ""
     piper_config: str = ""
     piper_speaker_id: int | None = None
@@ -112,8 +113,9 @@ def _voice(draft: NpcDraft, existing: dict[str, object] | None = None) -> dict[s
     gemini = dict(gemini_value) if isinstance(gemini_value, dict) else {}
     gemini["voice"] = draft.gemini_voice
     providers["gemini"] = gemini
-    if draft.piper_model:
+    if draft.piper_voice or draft.piper_model:
         providers["piper"] = {
+            "voice": draft.piper_voice,
             "model": draft.piper_model,
             "config": draft.piper_config,
             "speaker_id": draft.piper_speaker_id,
@@ -198,6 +200,7 @@ def draft_from_npc(npc: Npc) -> NpcDraft:
         speaking_style=sections.get("speaking style", "natural"),
         preferred_voice_provider=voice.preferred_provider,
         gemini_voice=provider.voice if provider else "Aoede",
+        piper_voice=piper.voice if piper else "",
         piper_model=piper.model if piper else "",
         piper_config=piper.config if piper else "",
         piper_speaker_id=piper.speaker_id if piper else None,

@@ -48,10 +48,14 @@ class NpcDialog(QDialog):
         credentials: CredentialStore | None = None,
         draft: NpcDraft | None = None,
         voice_base_directory: str = ".",
+        voice_root: Path | None = None,
+        default_voice_provider: str = "gemini",
     ) -> None:
         super().__init__(parent)
         self._credentials = credentials or CredentialStore()
         self._voice_base_directory = voice_base_directory
+        self._voice_root = voice_root
+        self._default_voice_provider = default_voice_provider
         self._pending_generations: dict[str, asyncio.Task[None]] = {}
         self._pending_expansion: asyncio.Task[None] | None = None
         self.setWindowTitle("Create NPC")
@@ -100,6 +104,8 @@ class NpcDialog(QDialog):
         self.voice_gender_input = QComboBox()
         self.voice_gender_input.addItems(GEMINI_GENDERS)
         self.voice_input = QComboBox()
+        self.piper_voice_input = QLineEdit()
+        self.piper_voice_input.setPlaceholderText("Name from voices.yaml")
         self.piper_model_input = QLineEdit()
         self.piper_model_button = QPushButton("Browse…")
         self.piper_model_button.clicked.connect(self._browse_piper_model)
@@ -147,6 +153,7 @@ class NpcDialog(QDialog):
         form.addRow("Speaking style", self._field_with_ai(self.style_input, "speaking_style"))
         form.addRow("Voice gender", self.voice_gender_input)
         form.addRow("Gemini voice", self._field_with_ai(self.voice_input, "gemini_voice"))
+        form.addRow("Piper registered voice", self.piper_voice_input)
         form.addRow(
             "Piper model", self._path_field(self.piper_model_input, self.piper_model_button)
         )
@@ -199,6 +206,7 @@ class NpcDialog(QDialog):
             self._apply_draft(draft)
             self.id_input.setEnabled(False)
         else:
+            self.voice_provider_input.setCurrentText(self._default_voice_provider)
             self._set_voice("Aoede")
 
     def _apply_draft(self, draft: NpcDraft) -> None:
@@ -217,6 +225,7 @@ class NpcDialog(QDialog):
         self.style_input.setCurrentText(draft.speaking_style)
         self.voice_provider_input.setCurrentText(draft.preferred_voice_provider)
         self._set_voice(draft.gemini_voice)
+        self.piper_voice_input.setText(draft.piper_voice)
         self.piper_model_input.setText(draft.piper_model)
         self.piper_config_input.setText(draft.piper_config)
         self.piper_speaker_input.setValue(
@@ -363,6 +372,7 @@ class NpcDialog(QDialog):
         name = self.name_input.text().strip() or "this character"
         try:
             piper = VoiceProviderConfig(
+                voice=self.piper_voice_input.text().strip(),
                 model=self.piper_model_input.text().strip(),
                 config=self.piper_config_input.text().strip(),
                 speaker_id=(
@@ -388,6 +398,7 @@ class NpcDialog(QDialog):
                 "This is how I will sound at the table.",
                 base_directory=Path(self._voice_base_directory),
                 api_key=api_key,
+                voice_root=self._voice_root,
             )
         except Exception as exc:
             QMessageBox.critical(self, "Voice preview error", str(exc))
@@ -540,6 +551,7 @@ class NpcDialog(QDialog):
             speaking_style=self.style_input.currentText().strip(),
             preferred_voice_provider=self.voice_provider_input.currentText(),
             gemini_voice=self.voice_input.currentText(),
+            piper_voice=self.piper_voice_input.text().strip(),
             piper_model=self.piper_model_input.text().strip(),
             piper_config=self.piper_config_input.text().strip(),
             piper_speaker_id=(

@@ -10,7 +10,8 @@ from qasync import QEventLoop
 
 from voice_assistant.storage.settings import (
     AppearanceSettings,
-    AppSettings,
+    ProviderSettings,
+    SpeechSettings,
     StorageSettings,
     load_settings,
     resolve_campaign_root,
@@ -48,26 +49,31 @@ def main() -> int:
     application.setApplicationName("RPG Voice Assistant")
     application.setOrganizationName("RobertShort")
     apply_theme(settings.appearance.theme, target=application)
-    window = MainWindow(campaign_root, theme=settings.appearance.theme)
+    window = MainWindow(
+        campaign_root,
+        theme=settings.appearance.theme,
+        providers=settings.providers,
+        speech=settings.speech,
+    )
+    current_settings = settings.model_copy(update={"storage": storage})
+
+    def persist(**updates: object) -> None:
+        nonlocal current_settings
+        current_settings = current_settings.model_copy(update=updates)
+        save_settings(current_settings, arguments.config)
 
     def save_campaign_root(path: Path) -> None:
-        updated = AppSettings(
-            storage=StorageSettings(campaign_root=path, portable_mode=False),
-            providers=settings.providers,
-            appearance=settings.appearance,
-        )
-        save_settings(updated, arguments.config)
+        persist(storage=StorageSettings(campaign_root=path, portable_mode=False))
 
     def save_theme(name: str) -> None:
-        updated = AppSettings(
-            storage=settings.storage,
-            providers=settings.providers,
-            appearance=AppearanceSettings(theme=name),
-        )
-        save_settings(updated, arguments.config)
+        persist(appearance=AppearanceSettings(theme=name))
+
+    def save_tts(providers: ProviderSettings, speech: SpeechSettings) -> None:
+        persist(providers=providers, speech=speech)
 
     window.campaign_root_changed.connect(save_campaign_root)
     window.theme_changed.connect(save_theme)
+    window.tts_settings_changed.connect(save_tts)
     window.show()
     event_loop = QEventLoop(application)
     asyncio.set_event_loop(event_loop)

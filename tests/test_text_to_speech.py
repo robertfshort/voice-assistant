@@ -21,7 +21,12 @@ def test_speak_text_routes_tagged_segments_to_piper(
     calls: list[tuple[str, str]] = []
 
     async def fake_speak(
-        config: VoiceProviderConfig, base_directory: Path, text: str, mood: str = ""
+        config: VoiceProviderConfig,
+        base_directory: Path,
+        text: str,
+        mood: str = "",
+        *,
+        voice_root: Path | None = None,
     ) -> None:
         assert config.model == "voices/mara.onnx"
         assert base_directory == tmp_path
@@ -42,3 +47,39 @@ def test_speak_text_routes_tagged_segments_to_piper(
     )
 
     assert calls == [("", "Hello."), ("whisper", "Keep this quiet.")]
+
+
+def test_speak_text_falls_back_from_piper_to_gemini(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    calls: list[str] = []
+
+    async def broken_piper(*args: object, **kwargs: object) -> None:
+        calls.append("piper")
+        raise FileNotFoundError("model missing")
+
+    async def working_gemini(*args: object, **kwargs: object) -> None:
+        calls.append("gemini")
+
+    monkeypatch.setattr(text_to_speech, "speak_piper", broken_piper)
+    monkeypatch.setattr(text_to_speech, "preview_voice", working_gemini)
+    voice = VoiceConfig(
+        preferred_provider="piper",
+        providers={
+            "piper": VoiceProviderConfig(model="missing.onnx"),
+            "gemini": VoiceProviderConfig(voice="Kore"),
+        },
+    )
+
+    used = asyncio.run(
+        text_to_speech.speak_text(
+            voice,
+            "Hello.",
+            base_directory=tmp_path,
+            api_key="test-key",
+            fallback_order=("gemini",),
+        )
+    )
+
+    assert used == "gemini"
+    assert calls == ["piper", "gemini"]

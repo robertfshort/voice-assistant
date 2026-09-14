@@ -74,7 +74,12 @@ def test_voice_preview_uses_current_voice_mood_and_style(
     captured: dict[str, object] = {}
 
     async def fake_speak(
-        voice: object, text: str, *, base_directory: Path, api_key: str = ""
+        voice: object,
+        text: str,
+        *,
+        base_directory: Path,
+        api_key: str = "",
+        voice_root: Path | None = None,
     ) -> None:
         captured.update(
             voice=voice,

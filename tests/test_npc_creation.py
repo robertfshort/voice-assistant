@@ -33,6 +33,7 @@ def _draft(npc_id: str = "guildmaster-vale") -> NpcDraft:
         speaking_style="measured",
         preferred_voice_provider="piper",
         gemini_voice="Charon",
+        piper_voice="guildmaster",
         piper_model="voices/vale.onnx",
         piper_config="voices/vale.onnx.json",
         piper_speaker_id=2,
@@ -57,6 +58,7 @@ def test_create_npc_writes_a_loadable_portable_character(tmp_path: Path) -> None
     assert npc.voice.style == "confident, measured"
     assert npc.voice.preferred_provider == "piper"
     assert npc.voice.providers["gemini"].voice == "Charon"
+    assert npc.voice.providers["piper"].voice == "guildmaster"
     assert npc.voice.providers["piper"].model == "voices/vale.onnx"
     assert npc.voice.providers["piper"].speaker_id == 2
     assert npc.secrets == ()
@@ -104,6 +106,7 @@ def test_draft_from_npc_reads_editable_profile_fields(tmp_path: Path) -> None:
     assert draft.affiliations == "- Merchants Guild\n- Order of the Rose"
     assert draft.preferred_voice_provider == "piper"
     assert draft.gemini_voice == "Charon"
+    assert draft.piper_voice == "guildmaster"
     assert draft.piper_model == "voices/vale.onnx"
     assert draft.piper_speaker_id == 2
 

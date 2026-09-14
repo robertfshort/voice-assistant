@@ -22,7 +22,14 @@ class ProviderSettings(BaseModel):
 
     conversation: str = "gemini"
     transcription: str = "gemini-live"
-    speech: str = "gemini-live"
+    speech: str = "gemini"
+
+
+class SpeechSettings(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    voice_root: Path | None = None
+    fallback_order: tuple[str, ...] = ("piper", "gemini")
 
 
 class AppearanceSettings(BaseModel):
@@ -36,6 +43,7 @@ class AppSettings(BaseModel):
 
     storage: StorageSettings = Field(default_factory=StorageSettings)
     providers: ProviderSettings = Field(default_factory=ProviderSettings)
+    speech: SpeechSettings = Field(default_factory=SpeechSettings)
     appearance: AppearanceSettings = Field(default_factory=AppearanceSettings)
 
 

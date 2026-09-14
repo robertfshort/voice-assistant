@@ -89,6 +89,8 @@ def test_duplicate_npc_creates_a_copy(
             credentials: object,
             draft: NpcDraft,
             voice_base_directory: str,
+            voice_root: Path | None,
+            default_voice_provider: str,
         ) -> None:
             pass
 
