@@ -40,9 +40,13 @@ def propose_npc_lore(npc: Npc) -> LoreRecord | None:
 
 
 def render_lore_file(record: LoreRecord) -> str:
+    scopes = ""
+    if record.scopes:
+        scopes = "scopes:\n" + "".join(f"  - {scope}\n" for scope in record.scopes)
     return (
         "---\n"
         f"visibility: {record.visibility}\n"
+        f"{scopes}"
         f"provenance: {record.provenance}\n"
         f"status: {record.status}\n"
         f"title: {record.title}\n"

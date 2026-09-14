@@ -9,6 +9,7 @@ from PySide6.QtCore import QPoint, Qt, Signal
 from PySide6.QtGui import QAction, QActionGroup, QColor, QTextCursor
 from PySide6.QtWidgets import (
     QCheckBox,
+    QComboBox,
     QDialog,
     QFileDialog,
     QFormLayout,
@@ -748,14 +749,23 @@ class MainWindow(QMainWindow):
         dialog = QDialog(self)
         dialog.setWindowTitle("Review proposed public lore")
         layout = QVBoxLayout(dialog)
+        form = QFormLayout()
+        visibility_input = QComboBox()
+        visibility_input.addItems(["public", "restricted", "secret", "gm-only"])
+        visibility_input.setCurrentText(proposed.visibility)
+        form.addRow("Visibility", visibility_input)
+        scopes_input = QLineEdit()
+        scopes_input.setText(", ".join(proposed.scopes))
+        scopes_input.setPlaceholderText("order-of-the-rose, western-border")
+        form.addRow("Scopes", scopes_input)
+        target_input = QLineEdit(proposed.id)
+        form.addRow("Lore file", target_input)
+        layout.addLayout(form)
         layout.addWidget(QLabel("Content"))
         editor = QTextEdit()
-        editor.setPlainText(render_lore_file(proposed))
+        editor.setPlainText(proposed.body)
         editor.setMinimumHeight(300)
         layout.addWidget(editor)
-        layout.addWidget(QLabel("Lore file"))
-        target_input = QLineEdit(proposed.id)
-        layout.addWidget(target_input)
         buttons = QHBoxLayout()
         cancel = QPushButton("Cancel")
         cancel.clicked.connect(dialog.reject)
@@ -769,9 +779,18 @@ class MainWindow(QMainWindow):
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         lore_id = target_input.text().strip()
-        content = editor.toPlainText()
         if not lore_id:
             return
+        updated = proposed.model_copy(
+            update={
+                "visibility": visibility_input.currentText(),
+                "scopes": tuple(
+                    s.strip() for s in scopes_input.text().strip().split(",") if s.strip()
+                ),
+                "body": editor.toPlainText().strip(),
+            }
+        )
+        content = render_lore_file(updated)
         try:
             save_lore_proposal(
                 self._active_campaign.directory,
