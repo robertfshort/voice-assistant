@@ -40,6 +40,7 @@ class Npc(BaseModel):
     affiliations: tuple[str, ...] = ()
     voice: VoiceConfig = Field(default_factory=VoiceConfig)
     portrait: str | None = None
+    archived: bool = False
 
 
 class LoreSection(BaseModel):

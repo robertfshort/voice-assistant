@@ -140,6 +140,7 @@ def _load_npc(directory: Path) -> Npc:
         affiliations=_parse_affiliations(sections.get("affiliations", "")),
         voice=voice,
         portrait=portrait,
+        archived=sections.get("status", "").lower() == "archived",
     )
 
 

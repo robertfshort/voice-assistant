@@ -5,6 +5,7 @@ import re
 
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QDialog,
     QDialogButtonBox,
@@ -120,6 +121,9 @@ class NpcDialog(QDialog):
         portrait_layout.addWidget(self.portrait_preview)
         form.addRow("Portrait", portrait_layout)
 
+        self.archived_input = QCheckBox("Archived (hide from active NPC list)")
+        form.addRow(self.archived_input)
+
         layout.addLayout(form)
 
         action_row = QHBoxLayout()
@@ -161,6 +165,7 @@ class NpcDialog(QDialog):
         if draft.portrait:
             self.portrait_input.setText(draft.portrait)
             self._load_portrait_preview(draft.portrait)
+        self.archived_input.setChecked(draft.archived)
 
     def _browse_portrait(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
@@ -433,4 +438,5 @@ class NpcDialog(QDialog):
             speaking_style=self.style_input.currentText().strip(),
             gemini_voice=self.voice_input.currentText(),
             portrait=self.portrait_input.text().strip() or None,
+            archived=self.archived_input.isChecked(),
         )

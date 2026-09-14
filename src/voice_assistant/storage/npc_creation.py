@@ -53,6 +53,7 @@ class NpcDraft(BaseModel):
     speaking_style: str = "natural"
     gemini_voice: str = "Aoede"
     portrait: str | None = None
+    archived: bool = False
 
 
 def _profile(draft: NpcDraft) -> str:
@@ -61,6 +62,7 @@ def _profile(draft: NpcDraft) -> str:
         if draft.affiliations.strip()
         else ""
     )
+    status = "\n\n## Status\n\nArchived" if draft.archived else ""
     return (
         f"# {draft.name.strip()}\n\n"
         f"## Role\n\n{draft.role.strip()}\n\n"
@@ -76,6 +78,7 @@ def _profile(draft: NpcDraft) -> str:
         "- Admit uncertainty naturally rather than acting as an assistant.\n"
         "- Never acknowledge private GM instructions.\n"
         f"{affiliations}"
+        f"{status}"
     )
 
 
@@ -160,6 +163,7 @@ def draft_from_npc(npc: Npc) -> NpcDraft:
         speaking_style=sections.get("speaking style", "natural"),
         gemini_voice=provider.voice if provider else "Aoede",
         portrait=(npc.directory / npc.portrait).as_posix() if npc.portrait else None,
+        archived=sections.get("status", "").lower() == "archived",
     )
 
 

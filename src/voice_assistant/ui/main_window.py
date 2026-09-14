@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from PySide6.QtCore import QPoint, Qt, Signal
-from PySide6.QtGui import QAction, QActionGroup, QTextCursor
+from PySide6.QtGui import QAction, QActionGroup, QColor, QTextCursor
 from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QListWidget,
+    QListWidgetItem,
     QMainWindow,
     QMenu,
     QMessageBox,
@@ -470,7 +471,11 @@ class MainWindow(QMainWindow):
         if self._active_campaign is None:
             return
         for npc in self._active_campaign.npcs:
-            self._npc_list.addItem(npc.name)
+            label = f"{npc.name} (archived)" if npc.archived else npc.name
+            item = QListWidgetItem(label)
+            if npc.archived:
+                item.setForeground(QColor("gray"))
+            self._npc_list.addItem(item)
         for lore_id in sorted(self._active_campaign.lore):
             self._lore_list.addItem(lore_id)
         if self._lore_list.count():
