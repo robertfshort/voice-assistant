@@ -46,7 +46,24 @@ def test_edit_dialog_prefills_fields_and_locks_stable_id(qtbot: QtBot) -> None:
     assert dialog.name_input.text() == "Mara Vale"
     assert dialog.id_input.text() == "mara-vale"
     assert not dialog.id_input.isEnabled()
+    assert dialog.voice_gender_input.currentText() == "Female"
     assert dialog.voice_input.currentText() == "Kore"
+
+
+def test_voice_gender_filter_populates_and_syncs(qtbot: QtBot) -> None:
+    dialog = NpcDialog()
+    qtbot.addWidget(dialog)
+
+    assert dialog.voice_gender_input.currentText() == "Female"
+    assert dialog.voice_input.count() == 14
+    dialog._set_voice("Charon")
+
+    assert dialog.voice_gender_input.currentText() == "Male"
+    assert dialog.voice_input.currentText() == "Charon"
+    assert "Kore" not in [
+        dialog.voice_input.itemText(i) for i in range(dialog.voice_input.count())
+    ]
+    assert "Puck" in [dialog.voice_input.itemText(i) for i in range(dialog.voice_input.count())]
 
 
 def test_voice_preview_uses_current_voice_mood_and_style(
@@ -69,7 +86,7 @@ def test_voice_preview_uses_current_voice_mood_and_style(
     dialog = NpcDialog()
     qtbot.addWidget(dialog)
     dialog.name_input.setText("Mara Vale")
-    dialog.voice_input.setCurrentText("Kore")
+    dialog._set_voice("Kore")
     dialog.mood_input.setCurrentText("warm")
     dialog.style_input.setCurrentText("measured")
     dialog.voice_preview_button.setEnabled(False)

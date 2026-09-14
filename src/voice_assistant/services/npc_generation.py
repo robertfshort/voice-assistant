@@ -7,6 +7,8 @@ from roomkit.providers.ai.base import AIContext, AIMessage
 from roomkit.providers.gemini.ai import GeminiAIProvider
 from roomkit.providers.gemini.config import GeminiConfig
 
+from voice_assistant.services.gemini_voices import GEMINI_VOICES
+
 
 class NpcExpansion(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -89,9 +91,7 @@ async def generate_npc_field(
         else "Generate a replacement value, overwriting the existing value."
     )
     constraint = (
-        " Choose exactly one of: Aoede, Charon, Fenrir, Kore, Leda, Orus, Puck, Zephyr."
-        if field == "gemini_voice"
-        else ""
+        f" Choose exactly one of: {', '.join(GEMINI_VOICES)}." if field == "gemini_voice" else ""
     )
     public_rule = " Do not include secrets." if field == "public_knowledge" else ""
     prompt = (

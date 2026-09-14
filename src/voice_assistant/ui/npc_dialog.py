@@ -17,6 +17,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from voice_assistant.services.gemini_voices import (
+    GEMINI_GENDERS,
+    gender_for_voice,
+    voices_for_gender,
+)
 from voice_assistant.services.npc_generation import (
     NpcExpansion,
     expand_npc,
@@ -66,10 +71,9 @@ class NpcDialog(QDialog):
         self.style_input.addItems(
             ("natural", "measured", "conversational", "formal", "terse", "animated")
         )
+        self.voice_gender_input = QComboBox()
+        self.voice_gender_input.addItems(GEMINI_GENDERS)
         self.voice_input = QComboBox()
-        self.voice_input.addItems(
-            ("Aoede", "Charon", "Fenrir", "Kore", "Leda", "Orus", "Puck", "Zephyr")
-        )
 
         form.addRow("Name", self._field_with_ai(self.name_input, "name"))
         form.addRow("Stable ID", self.id_input)
@@ -88,6 +92,7 @@ class NpcDialog(QDialog):
         )
         form.addRow("Mood", self._field_with_ai(self.mood_input, "mood"))
         form.addRow("Speaking style", self._field_with_ai(self.style_input, "speaking_style"))
+        form.addRow("Voice gender", self.voice_gender_input)
         form.addRow("Gemini voice", self._field_with_ai(self.voice_input, "gemini_voice"))
         layout.addLayout(form)
 
@@ -106,10 +111,14 @@ class NpcDialog(QDialog):
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
+        self.voice_gender_input.currentTextChanged.connect(self._on_gender_changed)
+        self.voice_input.currentTextChanged.connect(self._on_voice_changed)
         if draft is not None:
             self.setWindowTitle("Edit NPC")
             self._apply_draft(draft)
             self.id_input.setEnabled(False)
+        else:
+            self._set_voice("Aoede")
 
     def _apply_draft(self, draft: NpcDraft) -> None:
         self.name_input.setText(draft.name)
@@ -121,7 +130,48 @@ class NpcDialog(QDialog):
         self.public_knowledge_input.setPlainText(draft.public_knowledge)
         self.mood_input.setCurrentText(draft.mood)
         self.style_input.setCurrentText(draft.speaking_style)
-        self.voice_input.setCurrentText(draft.gemini_voice)
+        self._set_voice(draft.gemini_voice)
+
+    def _on_gender_changed(self) -> None:
+        gender = self.voice_gender_input.currentText()
+        voices = voices_for_gender(gender)
+        current_voice = self.voice_input.currentText()
+        self.voice_input.blockSignals(True)
+        self.voice_input.clear()
+        self.voice_input.addItems(voices)
+        new_voice = current_voice if current_voice in voices else voices[0]
+        self.voice_input.setCurrentText(new_voice)
+        self.voice_input.blockSignals(False)
+
+    def _on_voice_changed(self) -> None:
+        voice = self.voice_input.currentText()
+        if not voice:
+            return
+        gender = gender_for_voice(voice)
+        if gender != self.voice_gender_input.currentText():
+            self.voice_gender_input.blockSignals(True)
+            self.voice_gender_input.setCurrentText(gender)
+            self.voice_gender_input.blockSignals(False)
+            voices = voices_for_gender(gender)
+            if voice in voices:
+                self.voice_input.blockSignals(True)
+                self.voice_input.clear()
+                self.voice_input.addItems(voices)
+                self.voice_input.setCurrentText(voice)
+                self.voice_input.blockSignals(False)
+
+    def _set_voice(self, voice: str) -> None:
+        gender = gender_for_voice(voice)
+        self.voice_gender_input.blockSignals(True)
+        self.voice_gender_input.setCurrentText(gender)
+        self.voice_gender_input.blockSignals(False)
+        self.voice_input.blockSignals(True)
+        self.voice_input.clear()
+        self.voice_input.addItems(voices_for_gender(gender))
+        if self.voice_input.findText(voice) < 0:
+            self.voice_input.addItem(voice)
+        self.voice_input.setCurrentText(voice)
+        self.voice_input.blockSignals(False)
 
     def _field_with_ai(
         self, field_widget: QWidget, field: str, *, flesh_out: bool = False
@@ -248,9 +298,7 @@ class NpcDialog(QDialog):
         elif field == "speaking_style":
             self.style_input.setCurrentText(value)
         elif field == "gemini_voice":
-            if self.voice_input.findText(value) < 0:
-                self.voice_input.addItem(value)
-            self.voice_input.setCurrentText(value)
+            self._set_voice(value)
 
     def _suggest_id(self, name: str) -> None:
         if self.id_input.isModified():

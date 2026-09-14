@@ -1,7 +1,6 @@
-style: guarded, She speaks in short, measured sentences and rarely answers more than
-  was asked.
+style: guarded, measured, dry humor
 providers:
   gemini:
-    voice: Kore
+    voice: Aoede
   local-piper:
     voice: en_GB-alba-medium
