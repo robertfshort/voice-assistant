@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import html
+from datetime import UTC, datetime
 from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal
@@ -807,11 +808,19 @@ class MainWindow(QMainWindow):
         memory.setPlainText(notes.proposed_memory)
         layout.addWidget(memory)
         if notes.proposed_lore:
-            layout.addWidget(QLabel("Proposed lore"))
-            lore = QTextEdit()
-            lore.setReadOnly(True)
-            lore.setPlainText("\n".join(f"- {item}" for item in notes.proposed_lore))
-            layout.addWidget(lore)
+            layout.addWidget(QLabel("Proposed lore (edit before creating)"))
+            lore_editor = QTextEdit()
+            lore_editor.setPlainText(
+                "# Session-derived lore\n\n"
+                + "\n".join(f"- {item}" for item in notes.proposed_lore)
+            )
+            layout.addWidget(lore_editor)
+            create_lore = QPushButton("Create session lore")
+            create_lore.clicked.connect(lambda: self._save_session_lore(lore_editor.toPlainText()))
+            lore_buttons = QHBoxLayout()
+            lore_buttons.addWidget(create_lore)
+            lore_buttons.addStretch()
+            layout.addLayout(lore_buttons)
         buttons = QHBoxLayout()
         append = QPushButton("Append memory to NPC")
         append.clicked.connect(dialog.accept)
@@ -847,6 +856,43 @@ class MainWindow(QMainWindow):
             )
             self._npc_list.setCurrentRow(npc_row)
             self.statusBar().showMessage(f"Appended {len(notes.proposed_memory)} bytes to memory")
+
+    def _save_session_lore(self, content: str) -> None:
+        if self._active_campaign is None:
+            return
+        npc_id = self._active_npc.id if self._active_npc is not None else "session"
+        stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
+        default = f"session-proposed/{npc_id}-{stamp}.md"
+        lore_id, accepted = QInputDialog.getText(
+            self,
+            "Create session lore",
+            "File name relative to the lore folder",
+            text=default,
+        )
+        if not accepted or not lore_id.strip():
+            return
+        lore_id = lore_id.strip().replace("\\", "/")
+        try:
+            create_lore(self._active_campaign.directory, lore_id, content)
+        except ValueError as exc:
+            QMessageBox.critical(self, "Lore creation error", str(exc))
+            return
+        updated_campaign = load_campaign(self._active_campaign.directory)
+        campaign_index = self._campaigns.index(self._active_campaign)
+        campaigns = list(self._campaigns)
+        campaigns[campaign_index] = updated_campaign
+        self._campaigns = tuple(campaigns)
+        self._select_campaign(campaign_index)
+        lore_ids = sorted(updated_campaign.lore)
+        self._lore_list.setCurrentRow(lore_ids.index(lore_id))
+        self._lore_editor.setFocus()
+        if self._voice_session.active:
+            asyncio.create_task(self._voice_session.stop())
+            self.statusBar().showMessage(
+                "Created session lore; voice session stopped to reload context"
+            )
+        else:
+            self.statusBar().showMessage(f"Created session lore: {lore_id}")
 
     def _configure_gemini_key(self) -> None:
         key, accepted = QInputDialog.getText(
