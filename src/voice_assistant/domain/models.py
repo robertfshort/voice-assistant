@@ -67,6 +67,18 @@ class LoreRecord(BaseModel):
         return value
 
 
+class SpeakerProfile(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True, frozen=True)
+
+    id: str
+    name: str
+    path: Path
+    profile: str
+    affiliations: tuple[str, ...] = ()
+    relationships: tuple[str, ...] = ()
+    active: bool = False
+
+
 class CampaignManifest(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -82,6 +94,7 @@ class Campaign(BaseModel):
     manifest: CampaignManifest
     directory: Path
     npcs: tuple[Npc, ...]
+    speakers: tuple[SpeakerProfile, ...] = ()
     lore: dict[str, str] = Field(default_factory=dict)
     lore_records: dict[str, LoreRecord] = Field(default_factory=dict)
     scripts: dict[str, str] = Field(default_factory=dict)

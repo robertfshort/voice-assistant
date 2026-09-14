@@ -96,6 +96,18 @@ def build_npc_prompt(
         lore = _lore_for_npc(campaign.lore_records, npc)
         if lore:
             sections.extend(("# Campaign lore available to this NPC", lore))
+    active_speakers = [speaker for speaker in campaign.speakers if speaker.active]
+    if active_speakers:
+        speaker_text = "\n\n".join(
+            f"## {speaker.name}\n{speaker.profile.strip()}"
+            + (
+                f"\nAffiliations: {', '.join(speaker.affiliations)}"
+                if speaker.affiliations
+                else ""
+            )
+            for speaker in active_speakers
+        )
+        sections.extend(("# Speakers present", speaker_text))
     if private_directions:
         directions = "\n".join(f"- {direction}" for direction in private_directions)
         sections.extend(

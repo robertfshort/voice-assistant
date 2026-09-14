@@ -27,7 +27,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from voice_assistant.domain.models import Campaign, Npc
+from voice_assistant.domain.models import Campaign, Npc, SpeakerProfile
 from voice_assistant.services.conversation import explain_npc_lore
 from voice_assistant.services.session_notes import SessionNotes, propose_session_notes
 from voice_assistant.services.voice_session import VoiceSessionController
@@ -41,6 +41,7 @@ from voice_assistant.storage.npc_lore_proposals import (
     render_lore_file,
     save_lore_proposal,
 )
+from voice_assistant.storage.speakers import create_speaker, save_speaker
 from voice_assistant.storage.transcripts import append_transcript, load_transcript
 from voice_assistant.ui.npc_dialog import NpcDialog
 from voice_assistant.ui.themes import THEME_NAMES, apply_theme
@@ -56,6 +57,7 @@ class MainWindow(QMainWindow):
         self._campaigns: tuple[Campaign, ...] = ()
         self._active_campaign: Campaign | None = None
         self._active_npc: Npc | None = None
+        self._active_speaker: SpeakerProfile | None = None
         self._active_lore_id: str | None = None
         self._credentials = CredentialStore()
         self._voice_session = VoiceSessionController()
@@ -218,6 +220,39 @@ class MainWindow(QMainWindow):
         lore_layout.addLayout(lore_controls)
         tabs.addTab(lore, "Lore")
 
+        speakers = QWidget()
+        speakers_layout = QVBoxLayout(speakers)
+        speakers_layout.addWidget(QLabel("Speaker profiles"))
+        self._speaker_list = QListWidget()
+        self._speaker_list.currentRowChanged.connect(self._select_speaker)
+        speakers_layout.addWidget(self._speaker_list, 1)
+        self._speaker_name = QLineEdit()
+        self._speaker_name.setEnabled(False)
+        self._speaker_name.setPlaceholderText("Speaker name")
+        speakers_layout.addWidget(self._speaker_name)
+        self._speaker_active = QCheckBox("Active in this session")
+        self._speaker_active.setEnabled(False)
+        speakers_layout.addWidget(self._speaker_active)
+        speakers_layout.addWidget(QLabel("Public background"))
+        self._speaker_editor = QTextEdit()
+        self._speaker_editor.setPlaceholderText(
+            "Select a speaker to view or edit their public background"
+        )
+        self._speaker_editor.setEnabled(False)
+        speakers_layout.addWidget(self._speaker_editor, 3)
+        speaker_controls = QHBoxLayout()
+        self._new_speaker_button = QPushButton("Create speaker")
+        self._new_speaker_button.setEnabled(False)
+        self._new_speaker_button.clicked.connect(self._create_speaker)
+        self._save_speaker_button = QPushButton("Save speaker")
+        self._save_speaker_button.setEnabled(False)
+        self._save_speaker_button.clicked.connect(self._save_speaker)
+        speaker_controls.addStretch()
+        speaker_controls.addWidget(self._new_speaker_button)
+        speaker_controls.addWidget(self._save_speaker_button)
+        speakers_layout.addLayout(speaker_controls)
+        tabs.addTab(speakers, "Speakers")
+
         splitter.addWidget(tabs)
         splitter.setStretchFactor(1, 1)
         layout.addWidget(splitter, 1)
@@ -290,14 +325,24 @@ class MainWindow(QMainWindow):
     def _select_campaign(self, row: int) -> None:
         self._active_campaign = self._campaigns[row] if 0 <= row < len(self._campaigns) else None
         self._active_npc = None
+        self._active_speaker = None
         self._active_lore_id = None
         self._npc_list.clear()
         self._lore_list.clear()
+        self._speaker_list.clear()
         self._lore_editor.clear()
         self._lore_editor.setEnabled(False)
         self._save_lore_button.setEnabled(False)
+        self._speaker_name.clear()
+        self._speaker_name.setEnabled(False)
+        self._speaker_active.setChecked(False)
+        self._speaker_active.setEnabled(False)
+        self._speaker_editor.clear()
+        self._speaker_editor.setEnabled(False)
+        self._save_speaker_button.setEnabled(False)
         self._add_npc_button.setEnabled(self._active_campaign is not None)
         self._new_lore_button.setEnabled(self._active_campaign is not None)
+        self._new_speaker_button.setEnabled(self._active_campaign is not None)
         if self._active_campaign is None:
             return
         for npc in self._active_campaign.npcs:
@@ -306,6 +351,11 @@ class MainWindow(QMainWindow):
             self._lore_list.addItem(lore_id)
         if self._lore_list.count():
             self._lore_list.setCurrentRow(0)
+        for speaker in self._active_campaign.speakers:
+            label = f"{speaker.name} (active)" if speaker.active else speaker.name
+            self._speaker_list.addItem(label)
+        if self._speaker_list.count():
+            self._speaker_list.setCurrentRow(0)
         default_id = self._active_campaign.manifest.default_npc
         default_index = next(
             (
@@ -316,6 +366,105 @@ class MainWindow(QMainWindow):
             0,
         )
         self._npc_list.setCurrentRow(default_index)
+
+    def _select_speaker(self, row: int) -> None:
+        if self._active_campaign is None or not (0 <= row < len(self._active_campaign.speakers)):
+            self._active_speaker = None
+            self._speaker_name.clear()
+            self._speaker_name.setEnabled(False)
+            self._speaker_active.setChecked(False)
+            self._speaker_active.setEnabled(False)
+            self._speaker_editor.clear()
+            self._speaker_editor.setEnabled(False)
+            self._save_speaker_button.setEnabled(False)
+            return
+        self._active_speaker = self._active_campaign.speakers[row]
+        self._speaker_name.setText(self._active_speaker.name)
+        self._speaker_name.setEnabled(True)
+        self._speaker_active.setChecked(self._active_speaker.active)
+        self._speaker_active.setEnabled(True)
+        self._speaker_editor.setPlainText(self._active_speaker.profile)
+        self._speaker_editor.setEnabled(True)
+        self._save_speaker_button.setEnabled(True)
+
+    def _create_speaker(self) -> None:
+        if self._active_campaign is None:
+            return
+        speaker_id, accepted = QInputDialog.getText(
+            self,
+            "Create speaker",
+            "Speaker ID (used for the filename)",
+            text="new-speaker",
+        )
+        if not accepted or not speaker_id.strip():
+            return
+        speaker_id = speaker_id.strip().replace(" ", "-").lower()
+        name, accepted = QInputDialog.getText(
+            self,
+            "Create speaker",
+            "Display name",
+            text=speaker_id.replace("-", " ").title(),
+        )
+        if not accepted or not name.strip():
+            return
+        try:
+            create_speaker(self._active_campaign.directory, speaker_id, name.strip())
+        except ValueError as exc:
+            QMessageBox.critical(self, "Speaker creation error", str(exc))
+            return
+        updated_campaign = load_campaign(self._active_campaign.directory)
+        campaign_index = self._campaigns.index(self._active_campaign)
+        campaigns = list(self._campaigns)
+        campaigns[campaign_index] = updated_campaign
+        self._campaigns = tuple(campaigns)
+        self._select_campaign(campaign_index)
+        new_row = next(
+            index
+            for index, speaker in enumerate(updated_campaign.speakers)
+            if speaker.id == speaker_id
+        )
+        self._speaker_list.setCurrentRow(new_row)
+        self.statusBar().showMessage(f"Created speaker: {speaker_id}")
+
+    def _save_speaker(self) -> None:
+        if self._active_campaign is None or self._active_speaker is None:
+            return
+        reason, accepted = QInputDialog.getText(
+            self,
+            "Reason for change",
+            "Optional change note",
+        )
+        if not accepted:
+            return
+        updated = self._active_speaker.model_copy(
+            update={
+                "name": self._speaker_name.text().strip() or self._active_speaker.name,
+                "profile": self._speaker_editor.toPlainText().strip(),
+                "active": self._speaker_active.isChecked(),
+            }
+        )
+        try:
+            save_speaker(
+                self._active_campaign.directory,
+                updated,
+                reason=reason.strip() if reason.strip() else "",
+            )
+        except ValueError as exc:
+            QMessageBox.critical(self, "Speaker save error", str(exc))
+            return
+        updated_campaign = load_campaign(self._active_campaign.directory)
+        campaign_index = self._campaigns.index(self._active_campaign)
+        campaigns = list(self._campaigns)
+        campaigns[campaign_index] = updated_campaign
+        self._campaigns = tuple(campaigns)
+        self._select_campaign(campaign_index)
+        new_row = next(
+            index
+            for index, speaker in enumerate(updated_campaign.speakers)
+            if speaker.id == updated.id
+        )
+        self._speaker_list.setCurrentRow(new_row)
+        self.statusBar().showMessage(f"Saved speaker: {updated.id}")
 
     def _create_npc(self) -> None:
         if self._active_campaign is None:
