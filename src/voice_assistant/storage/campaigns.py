@@ -12,6 +12,7 @@ from voice_assistant.domain.models import (
     Campaign,
     CampaignManifest,
     LoreRecord,
+    LoreSection,
     Npc,
     Secret,
     VoiceConfig,
@@ -138,6 +139,28 @@ def _load_npc(directory: Path) -> Npc:
 
 
 _LORE_FRONT_MATTER = re.compile(r"^---\s*\n(.*?)\n---\s*\n(.*)$", re.DOTALL)
+_SCOPE_COMMENT = re.compile(r"<!--\s*(?:scope:\s*(.*?))?\s*-->", re.DOTALL)
+
+
+def _parse_lore_sections(body: str) -> tuple[LoreSection, ...]:
+    if not body.strip():
+        return ()
+    sections: list[LoreSection] = []
+    current_scope = ""
+    cursor = 0
+    for match in _SCOPE_COMMENT.finditer(body):
+        text = body[cursor : match.start()].strip()
+        if text:
+            sections.append(LoreSection(text=text, scope=current_scope))
+        scope = match.group(1)
+        current_scope = scope.strip() if scope else ""
+        cursor = match.end()
+    tail = body[cursor:].strip()
+    if tail:
+        sections.append(LoreSection(text=tail, scope=current_scope))
+    return tuple(sections)
+
+
 _PROFILE_SECTION = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
 _AFFILIATION_ITEM = re.compile(r"^[-*]\s+(.+)$", re.MULTILINE)
 
@@ -175,6 +198,7 @@ def _load_lore_records(directory: Path) -> dict[str, LoreRecord]:
             provenance=metadata.get("provenance", "manual"),
             status=metadata.get("status", "established"),
             body=body,
+            sections=_parse_lore_sections(body),
         )
     return records
 

@@ -32,6 +32,7 @@ The early alpha build currently supports:
 - Play session recording: A "Record session" button that writes all player, GM, and NPC turns into a shared `sessions/table-<id>.jsonl` file, with a Session tab to review the transcript
 - Conversation curation: Right-click a transcript line or selection to "Promote to lore" and create a new lore file
 - Lore metadata buttons: Insert YAML front matter (public, restricted, secret, gm-only, proposed) and `<!-- scope: ... -->` grouping comments from the Lore tab
+- In-document lore groupings: `<!-- scope: ... -->` HTML comments split a lore entry into sections, and only sections matching an NPC's affiliations are included in that NPC's prompt
 
 The next roadmap step is the next feature from the **## Future feature notes** section, likely one of play session transcription with audio/speaker attribution, in-app spell check, or the Piper/local TTS provider plan.
 

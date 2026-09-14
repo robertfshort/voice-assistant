@@ -4,10 +4,12 @@ from voice_assistant.domain.models import (
     Campaign,
     CampaignManifest,
     LoreRecord,
+    LoreSection,
     Npc,
     VoiceConfig,
 )
 from voice_assistant.services.conversation import (
+    _lore_body_for_npc,
     build_npc_prompt,
     explain_npc_lore,
     private_gm_instruction,
@@ -173,3 +175,29 @@ def test_explain_npc_lore_shows_inclusion_reasons() -> None:
     assert inclusions[0].reason == "Public knowledge available to all NPCs"
     assert inclusions[1].lore_id == "restricted.md"
     assert "order-of-the-rose" in inclusions[1].reason
+
+
+def test_lore_body_filters_sections_by_scope() -> None:
+    record = LoreRecord(
+        id="lore.md",
+        title="lore",
+        visibility="restricted",
+        scopes=("order-of-the-rose",),
+        sections=(
+            LoreSection(text="Shared across members.", scope=""),
+            LoreSection(text="For the order.", scope="order-of-the-rose"),
+            LoreSection(text="For the smugglers.", scope="crossroads-smugglers"),
+        ),
+    )
+    npc = Npc(
+        id="npc",
+        name="NPC",
+        directory=Path("npc"),
+        profile="# NPC\nNPC",
+        voice=VoiceConfig(),
+        affiliations=("order-of-the-rose",),
+    )
+    body = _lore_body_for_npc(record, npc)
+    assert "Shared across members." in body
+    assert "For the order." in body
+    assert "For the smugglers." not in body

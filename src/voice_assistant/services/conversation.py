@@ -53,12 +53,24 @@ def _lore_inclusions(records: dict[str, LoreRecord], npc: Npc) -> list[LoreInclu
     return inclusions
 
 
+def _lore_body_for_npc(record: LoreRecord, npc: Npc) -> str:
+    if not record.sections:
+        return record.body.strip()
+    scope_keys = _npc_scope_keys(npc)
+    parts = [
+        section.text
+        for section in record.sections
+        if record.visibility == "public" or not section.scope or section.scope in scope_keys
+    ]
+    return "\n\n".join(parts)
+
+
 def _lore_for_npc(records: dict[str, LoreRecord], npc: Npc) -> str:
     inclusions = _lore_inclusions(records, npc)[:_MAX_LORE_RECORDS]
     if not inclusions:
         return ""
     return "\n\n".join(
-        f"## {inclusion.title}\n{records[inclusion.lore_id].body.strip()}"
+        f"## {inclusion.title}\n{_lore_body_for_npc(records[inclusion.lore_id], npc)}"
         for inclusion in inclusions
     )
 

@@ -41,6 +41,13 @@ class Npc(BaseModel):
     voice: VoiceConfig = Field(default_factory=VoiceConfig)
 
 
+class LoreSection(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    text: str
+    scope: str = ""
+
+
 class LoreRecord(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -51,6 +58,7 @@ class LoreRecord(BaseModel):
     provenance: str = "manual"
     status: str = "established"
     body: str = ""
+    sections: tuple[LoreSection, ...] = ()
 
     @field_validator("visibility")
     @classmethod
