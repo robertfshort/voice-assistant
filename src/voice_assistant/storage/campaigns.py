@@ -141,6 +141,8 @@ def _load_npc(directory: Path) -> Npc:
         voice=voice,
         portrait=portrait,
         archived=sections.get("status", "").lower() == "archived",
+        home=sections.get("home region", ""),
+        location=sections.get("current location", ""),
     )
 
 

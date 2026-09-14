@@ -72,6 +72,10 @@ class NpcDialog(QDialog):
         self.affiliations_input.setToolTip(
             "One per line, or comma-separated. Used for restricted lore."
         )
+        self.home_input = QLineEdit()
+        self.home_input.setPlaceholderText("Where the NPC is from")
+        self.location_input = QLineEdit()
+        self.location_input.setPlaceholderText("Where the NPC is right now")
         self.mood_input = QComboBox()
         self.mood_input.setEditable(True)
         self.mood_input.addItems(
@@ -102,6 +106,8 @@ class NpcDialog(QDialog):
             self._field_with_ai(self.public_knowledge_input, "public_knowledge", flesh_out=True),
         )
         form.addRow("Affiliations", self.affiliations_input)
+        form.addRow("Home region", self.home_input)
+        form.addRow("Current location", self.location_input)
         form.addRow("Mood", self._field_with_ai(self.mood_input, "mood"))
         form.addRow("Speaking style", self._field_with_ai(self.style_input, "speaking_style"))
         form.addRow("Voice gender", self.voice_gender_input)
@@ -159,6 +165,8 @@ class NpcDialog(QDialog):
         self.goals_input.setPlainText(draft.goals)
         self.public_knowledge_input.setPlainText(draft.public_knowledge)
         self.affiliations_input.setPlainText(draft.affiliations)
+        self.home_input.setText(draft.home)
+        self.location_input.setText(draft.location)
         self.mood_input.setCurrentText(draft.mood)
         self.style_input.setCurrentText(draft.speaking_style)
         self._set_voice(draft.gemini_voice)
@@ -434,6 +442,8 @@ class NpcDialog(QDialog):
             goals=self.goals_input.toPlainText().strip(),
             public_knowledge=self.public_knowledge_input.toPlainText().strip(),
             affiliations=self.affiliations_input.toPlainText().strip(),
+            home=self.home_input.text().strip(),
+            location=self.location_input.text().strip(),
             mood=self.mood_input.currentText().strip(),
             speaking_style=self.style_input.currentText().strip(),
             gemini_voice=self.voice_input.currentText(),

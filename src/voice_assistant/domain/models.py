@@ -41,6 +41,8 @@ class Npc(BaseModel):
     voice: VoiceConfig = Field(default_factory=VoiceConfig)
     portrait: str | None = None
     archived: bool = False
+    home: str = ""
+    location: str = ""
 
 
 class LoreSection(BaseModel):
