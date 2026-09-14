@@ -69,6 +69,32 @@ Development should preserve that possibility without requiring the first release
 - Support in-text tags such as `[[whisper]]` or `[[nervously]]` to switch delivery style or mood for a section of the spoken line.
 - Keep the TTS control separate from the conversational AI response flow to avoid accidental model-generated replies.
 
+### Provider-neutral and local TTS (Piper)
+
+- Add a `speech` provider setting with options such as `gemini-live`, `piper`, and `system` (`pyttsx3` / `espeak`).
+- Let each NPC store provider-specific voice configs in `voice.yaml` so the same NPC can have a `gemini` voice, a `piper` model, and a `system` voice.
+- Add a global default TTS provider in `AppSettings.providers` and let the NPC dialog choose the preferred provider per NPC.
+- Piper settings per voice:
+  - `model` path to the `.onnx` model.
+  - `config` path to the `.onnx.json` config.
+  - `speaker_id` for multi-speaker models.
+  - `length_scale`, `noise_scale`, `noise_w`, and `sentence_silence` synthesis parameters.
+  - `sample_rate` and `channels` so the audio pipeline can resample to the output device.
+- Audio output settings:
+  - Output device selection.
+  - Resampling from the provider sample rate to the selected device rate.
+  - Buffer size and latency for `sounddevice`.
+- Mood tag mapping per provider:
+  - Gemini: keep the prompt-based `mood` wording.
+  - Piper: map `[[whisper]]` / `[[nervously]]` / `[[shout]]` to `length_scale` and `noise_scale` overrides, or skip mood for unsupported providers.
+  - System TTS: ignore mood tags and speak the text.
+- Provider fallback chain: if the selected provider fails (quota, missing model, no API key), try the next configured provider and record the fallback in the log.
+- Centralised voice/voices asset directory:
+  - `voices/` for `.onnx` / `.json` Piper models and a `voices.yaml` registry that maps voice names to provider-specific files.
+  - Let campaigns reference a voice by name instead of by absolute path, keeping campaigns portable.
+- TTS preview should be provider-aware: play a test sample from the selected NPC and provider.
+- Conversation TTS should also use the configured provider, with the same voice fallback and resampling.
+
 ### Spell check
 
 - Provide spell checking for lore, NPC profiles, memories, and player text in the application.
