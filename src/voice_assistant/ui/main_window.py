@@ -962,10 +962,49 @@ class MainWindow(QMainWindow):
 
     def _show_transcript_menu(self, pos: QPoint) -> None:
         menu = QMenu(self)
-        promote = menu.addAction("Promote to lore")
+        promote_lore = menu.addAction("Promote to lore")
+        promote_memory = menu.addAction("Promote to memory")
         action = menu.exec(self._transcript.mapToGlobal(pos))
-        if action == promote:
+        if action == promote_lore:
             self._promote_to_lore()
+        elif action == promote_memory:
+            self._promote_to_memory()
+
+    def _promote_to_memory(self) -> None:
+        if self._active_campaign is None or self._active_npc is None:
+            return
+        snippet = self._transcript.textCursor().selectedText()
+        if not snippet.strip():
+            cursor = self._transcript.textCursor()
+            cursor.select(QTextCursor.SelectionType.BlockUnderCursor)
+            snippet = cursor.selectedText()
+        snippet = snippet.replace("\u2029", "\n").strip()
+        if not snippet:
+            return
+        try:
+            append_npc_knowledge(
+                self._active_campaign.directory,
+                self._active_npc.id,
+                snippet,
+                reason="Promoted from transcript",
+            )
+        except ValueError as exc:
+            QMessageBox.critical(self, "Memory append error", str(exc))
+            return
+        updated_campaign = load_campaign(self._active_campaign.directory)
+        campaign_index = self._campaigns.index(self._active_campaign)
+        campaigns = list(self._campaigns)
+        campaigns[campaign_index] = updated_campaign
+        self._campaigns = tuple(campaigns)
+        self._select_campaign(campaign_index)
+        self._npc_list.setCurrentRow(
+            next(
+                index
+                for index, npc in enumerate(updated_campaign.npcs)
+                if npc.id == self._active_npc.id
+            )
+        )
+        self.statusBar().showMessage("Promoted selection to NPC memory")
 
     def _promote_to_lore(self) -> None:
         if self._active_campaign is None:

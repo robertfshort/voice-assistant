@@ -30,7 +30,7 @@ The early alpha build currently supports:
 - GM-controlled character TTS: A "Speak as NPC" button that lets the GM type text and speak it through the active NPC's configured Gemini voice without running the conversational AI
 - TTS mood tags: `[[whisper]]`, `[[nervously]]`, `[[/mood]]`, and similar tags in the typed line switch the TTS delivery for the following segment
 - Play session recording: A "Record session" button that writes all player, GM, and NPC turns into a shared `sessions/table-<id>.jsonl` file, with a Session tab to review the transcript
-- Conversation curation: Right-click a transcript line or selection to "Promote to lore" and create a new lore file
+- Conversation curation: Right-click a transcript line or selection to "Promote to lore" or "Promote to memory" for the active NPC
 - Lore metadata buttons: Insert YAML front matter (public, restricted, secret, gm-only, proposed) and `<!-- scope: ... -->` grouping comments from the Lore tab
 - In-document lore groupings: `<!-- scope: ... -->` HTML comments split a lore entry into sections, and only sections matching an NPC's affiliations are included in that NPC's prompt
 
