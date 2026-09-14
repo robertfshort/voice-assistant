@@ -38,6 +38,7 @@ class Npc(BaseModel):
     memory: str = ""
     secrets: tuple[Secret, ...] = ()
     affiliations: tuple[str, ...] = ()
+    relationships: tuple[str, ...] = ()
     voice: VoiceConfig = Field(default_factory=VoiceConfig)
     portrait: str | None = None
     archived: bool = False

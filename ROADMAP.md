@@ -18,7 +18,7 @@ The early alpha build currently supports:
 - Campaign management: Choose a campaigns folder, jump up one level, and create a new campaign with a default narrator NPC from the main window
 - 30 Gemini TTS voices with Male/Female filter
 - Voice preview in the create/edit NPC dialog
-- NPC home region and current location fields in the create/edit NPC dialog
+- NPC home region, current location, and relationships fields in the create/edit NPC dialog
 - Cached Gemini clients for voice previews and NPC generation
 - Debounced AI generation and capped prompt lore records
 - Live session reconfigure for private GM instructions instead of full reconnect

@@ -72,6 +72,9 @@ class NpcDialog(QDialog):
         self.affiliations_input.setToolTip(
             "One per line, or comma-separated. Used for restricted lore."
         )
+        self.relationships_input = QTextEdit()
+        self.relationships_input.setMaximumHeight(80)
+        self.relationships_input.setToolTip("One per line, or comma-separated.")
         self.home_input = QLineEdit()
         self.home_input.setPlaceholderText("Where the NPC is from")
         self.location_input = QLineEdit()
@@ -108,6 +111,7 @@ class NpcDialog(QDialog):
         form.addRow("Affiliations", self.affiliations_input)
         form.addRow("Home region", self.home_input)
         form.addRow("Current location", self.location_input)
+        form.addRow("Relationships", self.relationships_input)
         form.addRow("Mood", self._field_with_ai(self.mood_input, "mood"))
         form.addRow("Speaking style", self._field_with_ai(self.style_input, "speaking_style"))
         form.addRow("Voice gender", self.voice_gender_input)
@@ -167,6 +171,7 @@ class NpcDialog(QDialog):
         self.affiliations_input.setPlainText(draft.affiliations)
         self.home_input.setText(draft.home)
         self.location_input.setText(draft.location)
+        self.relationships_input.setPlainText(draft.relationships)
         self.mood_input.setCurrentText(draft.mood)
         self.style_input.setCurrentText(draft.speaking_style)
         self._set_voice(draft.gemini_voice)
@@ -442,6 +447,7 @@ class NpcDialog(QDialog):
             goals=self.goals_input.toPlainText().strip(),
             public_knowledge=self.public_knowledge_input.toPlainText().strip(),
             affiliations=self.affiliations_input.toPlainText().strip(),
+            relationships=self.relationships_input.toPlainText().strip(),
             home=self.home_input.text().strip(),
             location=self.location_input.text().strip(),
             mood=self.mood_input.currentText().strip(),

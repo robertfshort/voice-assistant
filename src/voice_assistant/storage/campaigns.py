@@ -143,6 +143,7 @@ def _load_npc(directory: Path) -> Npc:
         archived=sections.get("status", "").lower() == "archived",
         home=sections.get("home region", ""),
         location=sections.get("current location", ""),
+        relationships=_parse_affiliations(sections.get("relationships", "")),
     )
 
 

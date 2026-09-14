@@ -56,6 +56,7 @@ class NpcDraft(BaseModel):
     archived: bool = False
     home: str = ""
     location: str = ""
+    relationships: str = ""
 
 
 def _profile(draft: NpcDraft) -> str:
@@ -73,6 +74,11 @@ def _profile(draft: NpcDraft) -> str:
     location = (
         f"\n\n## Current location\n\n{draft.location.strip()}"
         if draft.location.strip()
+        else ""
+    )
+    relationships = (
+        f"\n\n## Relationships\n\n{draft.relationships.strip()}"
+        if draft.relationships.strip()
         else ""
     )
     return (
@@ -93,6 +99,7 @@ def _profile(draft: NpcDraft) -> str:
         f"{status}"
         f"{home}"
         f"{location}"
+        f"{relationships}"
     )
 
 
@@ -180,6 +187,7 @@ def draft_from_npc(npc: Npc) -> NpcDraft:
         archived=sections.get("status", "").lower() == "archived",
         home=sections.get("home region", ""),
         location=sections.get("current location", ""),
+        relationships=sections.get("relationships", ""),
     )
 
 
