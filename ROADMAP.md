@@ -27,6 +27,23 @@ The initial product is a portable RPG voice assistant, but its campaign, lore, N
 
 Development should preserve that possibility without requiring the first release to implement an entire virtual tabletop or campaign database. Conversation and narration remain the initial vertical slices; campaign management should grow around a stable domain model.
 
+## Future feature notes
+
+### Lore page metadata and grouping controls
+
+- Add buttons in the lore editor to insert YAML front matter (visibility, scopes, provenance, status) without requiring manual typing.
+- Support in-document groupings so a single lore entry can contain sections with different visibility/scope rules.
+- Use a lightweight Markdown convention, such as an HTML comment or a special heading marker, to flag a section as belonging to a group (for example, `<!-- scope: order-of-the-rose -->`).
+- Allow groupings to be evaluated per NPC based on that NPC's affiliations, memberships, and relationships.
+- Keep the raw Markdown human-readable and portable; an entry without annotations should remain public by default.
+
+### Speaker and PC profiles
+
+- Add a `pcs/` or `speakers/` directory in the campaign for player character and named speaker profiles.
+- Store per-speaker fields such as name, description, public background, affiliations, relationships, and preferred voice.
+- Let the GM mark active player(s) before or during a session.
+- Include only the appropriate speaker context in the NPC prompt so the AI knows who it is addressing while honoring the same visibility boundaries as lore.
+
 ## Near-term requirements
 
 ### Lore and NPC knowledge management
