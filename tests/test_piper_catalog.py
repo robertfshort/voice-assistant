@@ -1,13 +1,20 @@
 import asyncio
 import hashlib
 import json
+from collections.abc import Coroutine
+from dataclasses import replace
 from pathlib import Path
 from types import TracebackType
+from typing import Any
 
 import httpx
+from PySide6.QtWidgets import QAbstractItemView
 from pytest import MonkeyPatch
+from pytestqt.qtbot import QtBot
 
 from voice_assistant.services import piper_catalog
+from voice_assistant.ui import piper_catalog_dialog
+from voice_assistant.ui.piper_catalog_dialog import PiperCatalogDialog
 
 
 def _catalog() -> dict[str, object]:
@@ -131,3 +138,26 @@ def test_download_voice_verifies_then_registers_assets(
     registry = (tmp_path / "voices.yaml").read_text(encoding="utf-8")
     assert "en-us-test-medium" in registry
     assert (tmp_path / "piper" / registered / "en_US-test-medium.onnx").is_file()
+
+
+def test_catalog_dialog_supports_selecting_multiple_voices(
+    tmp_path: Path, qtbot: QtBot, monkeypatch: MonkeyPatch
+) -> None:
+    def discard_task(coroutine: Coroutine[Any, Any, Any]) -> None:
+        coroutine.close()
+
+    monkeypatch.setattr(piper_catalog_dialog.asyncio, "create_task", discard_task)
+    voice = piper_catalog.parse_catalog(_catalog())[0]
+    dialog = PiperCatalogDialog(tmp_path)
+    qtbot.addWidget(dialog)
+    dialog._voices = (voice, replace(voice, key="en_US-second-medium", name="second"))
+    dialog._refresh()
+    dialog.voice_list.item(0).setSelected(True)
+    dialog.voice_list.item(1).setSelected(True)
+
+    assert dialog.voice_list.selectionMode() == QAbstractItemView.SelectionMode.ExtendedSelection
+    assert [selected.key for selected in dialog._selected_voices()] == [
+        "en_US-test-medium",
+        "en_US-second-medium",
+    ]
+    assert dialog.download_button.text() == "Download and register 2 voices"

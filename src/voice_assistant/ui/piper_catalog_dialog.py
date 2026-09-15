@@ -5,6 +5,7 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QDialog,
     QHBoxLayout,
     QLabel,
@@ -35,15 +36,18 @@ class PiperCatalogDialog(QDialog):
         super().__init__(parent)
         self._voice_root = voice_root
         self._voices: tuple[PiperCatalogVoice, ...] = ()
-        self.setWindowTitle("Download Piper voice")
+        self.setWindowTitle("Download Piper voices")
         self.resize(700, 520)
         layout = QVBoxLayout(self)
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Filter by voice, language, country, or quality")
         self.search_input.textChanged.connect(self._refresh)
         layout.addWidget(self.search_input)
+        layout.addWidget(QLabel("Select one or more voices. Use Ctrl or Shift to select several."))
         self.voice_list = QListWidget()
+        self.voice_list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.voice_list.currentRowChanged.connect(self._show_selected)
+        self.voice_list.itemSelectionChanged.connect(self._selection_changed)
         layout.addWidget(self.voice_list, 1)
         self.details = QLabel("Loading Piper voice catalog…")
         self.details.setWordWrap(True)
@@ -54,12 +58,12 @@ class PiperCatalogDialog(QDialog):
         self.download_progress.connect(self._update_progress)
         controls = QHBoxLayout()
         controls.addStretch()
-        close_button = QPushButton("Close")
-        close_button.clicked.connect(self.reject)
+        self.close_button = QPushButton("Close")
+        self.close_button.clicked.connect(self.reject)
         self.download_button = QPushButton("Download and register")
         self.download_button.setEnabled(False)
         self.download_button.clicked.connect(self._confirm_download)
-        controls.addWidget(close_button)
+        controls.addWidget(self.close_button)
         controls.addWidget(self.download_button)
         layout.addLayout(controls)
         asyncio.create_task(self._load_catalog())
@@ -95,6 +99,21 @@ class PiperCatalogDialog(QDialog):
         value = item.data(Qt.ItemDataRole.UserRole) if item is not None else None
         return value if isinstance(value, PiperCatalogVoice) else None
 
+    def _selected_voices(self) -> tuple[PiperCatalogVoice, ...]:
+        voices: list[PiperCatalogVoice] = []
+        for item in self.voice_list.selectedItems():
+            value = item.data(Qt.ItemDataRole.UserRole)
+            if isinstance(value, PiperCatalogVoice):
+                voices.append(value)
+        return tuple(voices)
+
+    def _selection_changed(self) -> None:
+        count = len(self._selected_voices())
+        self.download_button.setEnabled(count > 0)
+        self.download_button.setText(
+            f"Download and register {count} voices" if count > 1 else "Download and register"
+        )
+
     def _show_selected(self) -> None:
         voice = self._selected()
         if voice is None:
@@ -121,44 +140,82 @@ class PiperCatalogDialog(QDialog):
             self.details.setText(details)
 
     def _confirm_download(self) -> None:
-        voice = self._selected()
-        if voice is None:
+        voices = self._selected_voices()
+        if not voices:
             return
-        registered_name = portable_voice_name(voice.key)
-        replace = registered_name in load_voice_registry(self._voice_root).piper
-        action = "replace the installed copy" if replace else "register it locally"
+        installed = load_voice_registry(self._voice_root).piper
+        replacements = {
+            voice.key for voice in voices if portable_voice_name(voice.key) in installed
+        }
+        total_bytes = sum(voice.size_bytes for voice in voices)
+        names = "\n".join(f"• {voice.key}" for voice in voices)
+        replacement_note = (
+            f"\n\n{len(replacements)} installed voice(s) will be replaced." if replacements else ""
+        )
         answer = QMessageBox.question(
             self,
-            "Update Piper voice?" if replace else "Download Piper voice?",
-            f"Download {voice.key} ({voice.size_mib:.1f} MiB) and {action}?",
+            "Download Piper voices?",
+            f"Download and register {len(voices)} voice(s) "
+            f"({total_bytes / (1024 * 1024):.1f} MiB total)?\n\n{names}{replacement_note}",
         )
         if answer != QMessageBox.StandardButton.Yes:
             return
         self.download_button.setEnabled(False)
-        self.download_button.setText("Downloading…")
-        self.progress.setRange(0, max(1, voice.size_bytes))
+        self.download_button.setText(f"Downloading 1 of {len(voices)}…")
+        self.search_input.setEnabled(False)
+        self.voice_list.setEnabled(False)
+        self.close_button.setEnabled(False)
+        self.progress.setRange(0, max(1, total_bytes))
         self.progress.setValue(0)
         self.progress.setVisible(True)
-        asyncio.create_task(self._download(voice, replace=replace))
+        asyncio.create_task(self._download(voices, replacements=replacements))
 
     def _update_progress(self, downloaded: int, total: int) -> None:
         self.progress.setMaximum(max(1, total))
         self.progress.setValue(downloaded)
 
-    async def _download(self, voice: PiperCatalogVoice, *, replace: bool = False) -> None:
-        try:
-            registered_name = await download_piper_voice(
-                voice, self._voice_root, self.download_progress.emit, replace=replace
-            )
-        except Exception as exc:
-            QMessageBox.critical(self, "Piper download error", str(exc))
-            self.download_button.setEnabled(True)
+    async def _download(
+        self, voices: tuple[PiperCatalogVoice, ...], *, replacements: set[str]
+    ) -> None:
+        registered: list[str] = []
+        failures: list[str] = []
+        total_bytes = sum(voice.size_bytes for voice in voices)
+        completed_bytes = 0
+        for index, voice in enumerate(voices, start=1):
+            self.download_button.setText(f"Downloading {index} of {len(voices)}…")
+
+            def report(downloaded: int, _total: int, *, offset: int = completed_bytes) -> None:
+                self.download_progress.emit(offset + downloaded, total_bytes)
+
+            try:
+                name = await download_piper_voice(
+                    voice,
+                    self._voice_root,
+                    report,
+                    replace=voice.key in replacements,
+                )
+            except Exception as exc:
+                failures.append(f"{voice.key}: {exc}")
+            else:
+                registered.append(name)
+            completed_bytes += voice.size_bytes
+            self.download_progress.emit(completed_bytes, total_bytes)
+
+        if registered:
+            message = "Registered:\n" + "\n".join(f"• {name}" for name in registered)
+            if failures:
+                message += "\n\nFailed:\n" + "\n".join(f"• {failure}" for failure in failures)
+                QMessageBox.warning(self, "Piper downloads completed with errors", message)
+            else:
+                QMessageBox.information(self, "Piper voices downloaded", message)
         else:
-            QMessageBox.information(
+            QMessageBox.critical(
                 self,
-                "Piper voice downloaded",
-                f"Registered as {registered_name!r}. Use this name in the NPC editor.",
+                "Piper download error",
+                "No voices were installed:\n" + "\n".join(f"• {failure}" for failure in failures),
             )
-        finally:
-            self.download_button.setText("Download and register")
-            self.progress.setVisible(False)
+        self.search_input.setEnabled(True)
+        self.voice_list.setEnabled(True)
+        self.close_button.setEnabled(True)
+        self.progress.setVisible(False)
+        self._selection_changed()
