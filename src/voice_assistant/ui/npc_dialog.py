@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QDoubleSpinBox,
     QFileDialog,
     QFormLayout,
+    QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -65,9 +66,15 @@ class NpcDialog(QDialog):
         self._pending_generations: dict[str, asyncio.Task[None]] = {}
         self._pending_expansion: asyncio.Task[None] | None = None
         self.setWindowTitle("Create NPC")
-        self.resize(620, 760)
+        self.resize(1100, 680)
         layout = QVBoxLayout(self)
-        form = QFormLayout()
+        columns = QHBoxLayout()
+        profile_group = QGroupBox("Character")
+        profile_form = QFormLayout(profile_group)
+        details_group = QGroupBox("Details")
+        details_form = QFormLayout(details_group)
+        voice_group = QGroupBox("Voice")
+        voice_form = QFormLayout(voice_group)
 
         self.name_input = QLineEdit()
         self.name_input.textChanged.connect(self._suggest_id)
@@ -146,63 +153,72 @@ class NpcDialog(QDialog):
         self.piper_channels_input.setRange(0, 2)
         self.piper_channels_input.setSpecialValueText("Automatic")
 
-        form.addRow("Name", self._field_with_ai(self.name_input, "name"))
-        form.addRow("Stable ID", self.id_input)
-        form.addRow("Role", self._field_with_ai(self.role_input, "role", flesh_out=True))
-        form.addRow(
+        profile_form.addRow("Name", self._field_with_ai(self.name_input, "name"))
+        profile_form.addRow("Stable ID", self.id_input)
+        profile_form.addRow("Role", self._field_with_ai(self.role_input, "role", flesh_out=True))
+        profile_form.addRow(
             "Personality",
             self._field_with_ai(self.personality_input, "personality", flesh_out=True),
         )
-        form.addRow(
-            "Background", self._field_with_ai(self.background_input, "background", flesh_out=True)
+        profile_form.addRow(
+            "Background",
+            self._field_with_ai(self.background_input, "background", flesh_out=True),
         )
-        form.addRow("Goals", self._field_with_ai(self.goals_input, "goals", flesh_out=True))
-        form.addRow(
+        profile_form.addRow(
+            "Goals", self._field_with_ai(self.goals_input, "goals", flesh_out=True)
+        )
+        profile_form.addRow(
             "Public knowledge",
             self._field_with_ai(self.public_knowledge_input, "public_knowledge", flesh_out=True),
         )
-        form.addRow("Affiliations", self.affiliations_input)
-        form.addRow("Home region", self.home_input)
-        form.addRow("Current location", self.location_input)
-        form.addRow("Relationships", self.relationships_input)
-        form.addRow("Mood", self._field_with_ai(self.mood_input, "mood"))
-        form.addRow("Preferred TTS", self.voice_provider_input)
-        form.addRow("Speaking style", self._field_with_ai(self.style_input, "speaking_style"))
-        form.addRow("Voice gender", self.voice_gender_input)
-        form.addRow("Gemini voice", self._field_with_ai(self.voice_input, "gemini_voice"))
-        form.addRow("Piper registered voice", self.piper_voice_input)
-        form.addRow(
+
+        details_form.addRow("Affiliations", self.affiliations_input)
+        details_form.addRow("Relationships", self.relationships_input)
+        details_form.addRow("Home region", self.home_input)
+        details_form.addRow("Current location", self.location_input)
+        voice_form.addRow("Mood", self._field_with_ai(self.mood_input, "mood"))
+        voice_form.addRow(
+            "Speaking style", self._field_with_ai(self.style_input, "speaking_style")
+        )
+        voice_form.addRow("Preferred TTS", self.voice_provider_input)
+        voice_form.addRow("Voice gender", self.voice_gender_input)
+        voice_form.addRow("Gemini voice", self._field_with_ai(self.voice_input, "gemini_voice"))
+        voice_form.addRow("Piper registered voice", self.piper_voice_input)
+        voice_form.addRow(
             "Piper model", self._path_field(self.piper_model_input, self.piper_model_button)
         )
-        form.addRow(
+        voice_form.addRow(
             "Piper config", self._path_field(self.piper_config_input, self.piper_config_button)
         )
-        form.addRow("Piper speaker", self.piper_speaker_input)
-        form.addRow("Piper length scale", self.piper_length_input)
-        form.addRow("Piper noise scale", self.piper_noise_input)
-        form.addRow("Piper noise width", self.piper_noise_w_input)
-        form.addRow("Piper sentence silence", self.piper_silence_input)
-        form.addRow("Piper output rate", self.piper_sample_rate_input)
-        form.addRow("Piper output channels", self.piper_channels_input)
+        voice_form.addRow("Piper speaker", self.piper_speaker_input)
+        voice_form.addRow("Piper length scale", self.piper_length_input)
+        voice_form.addRow("Piper noise scale", self.piper_noise_input)
+        voice_form.addRow("Piper noise width", self.piper_noise_w_input)
+        voice_form.addRow("Piper sentence silence", self.piper_silence_input)
+        voice_form.addRow("Piper output rate", self.piper_sample_rate_input)
+        voice_form.addRow("Piper output channels", self.piper_channels_input)
 
         self.portrait_input = QLineEdit()
         self.portrait_input.setReadOnly(True)
         self.portrait_browse_button = QPushButton("Browse…")
         self.portrait_browse_button.clicked.connect(self._browse_portrait)
         self.portrait_preview = QLabel()
-        self.portrait_preview.setFixedSize(128, 128)
+        self.portrait_preview.setFixedSize(96, 96)
         self.portrait_preview.setScaledContents(True)
         self.portrait_preview.setStyleSheet("border: 1px solid gray;")
         portrait_layout = QHBoxLayout()
         portrait_layout.addWidget(self.portrait_input, 1)
         portrait_layout.addWidget(self.portrait_browse_button)
         portrait_layout.addWidget(self.portrait_preview)
-        form.addRow("Portrait", portrait_layout)
+        details_form.addRow("Portrait", portrait_layout)
 
         self.archived_input = QCheckBox("Archived (hide from active NPC list)")
-        form.addRow(self.archived_input)
+        details_form.addRow(self.archived_input)
 
-        layout.addLayout(form)
+        columns.addWidget(profile_group, 4)
+        columns.addWidget(details_group, 2)
+        columns.addWidget(voice_group, 3)
+        layout.addLayout(columns, 1)
 
         action_row = QHBoxLayout()
         self.ai_expand_button = QPushButton("Generate this NPC with AI")
@@ -352,17 +368,21 @@ class NpcDialog(QDialog):
         layout = QHBoxLayout(container)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(field_widget, 1)
+        actions = QVBoxLayout()
+        actions.setContentsMargins(0, 0, 0, 0)
         generate_button = QPushButton("Generate with AI")
         generate_button.clicked.connect(
             lambda: self._start_field_generation(field, generate_button, flesh_out=False)
         )
-        layout.addWidget(generate_button)
+        actions.addWidget(generate_button)
         if flesh_out:
             flesh_button = QPushButton("Flesh out with AI")
             flesh_button.clicked.connect(
                 lambda: self._start_field_generation(field, flesh_button, flesh_out=True)
             )
-            layout.addWidget(flesh_button)
+            actions.addWidget(flesh_button)
+        actions.addStretch()
+        layout.addLayout(actions)
         return container
 
     def _existing_fields(self) -> dict[str, str]:
