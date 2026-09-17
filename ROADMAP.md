@@ -39,7 +39,7 @@ The early alpha build currently supports:
 - Lore metadata buttons: Insert YAML front matter (public, restricted, secret, gm-only, proposed) and `<!-- scope: ... -->` grouping comments from the Lore tab
 - In-document lore groupings: `<!-- scope: ... -->` HTML comments split a lore entry into sections, and only sections matching an NPC's affiliations are included in that NPC's prompt
 - Spell check: A "Spell check" button for the Lore, NPC knowledge, and speaker editors, using a portable `campaign/dictionary.txt` and showing suggestions for unknown words
-- Local session audio transcription: Record table audio, transcribe with faster-whisper, review the text, and assign a speaker from the active speakers or typed name before appending to the session
+- Local session audio transcription: Record table audio with a configurable input device, transcribe with faster-whisper using a configurable model, review the text, and assign a speaker from the active speakers or typed name before appending to the session
 
 The next roadmap step is the next feature from the **## Future feature notes** section, likely one of play session audio transcription and speaker attribution, expanding spell check to NPC profiles and memories, or the Piper/local TTS provider plan.
 

@@ -10,7 +10,7 @@ import faster_whisper
 
 class SessionTranscriber:
     def __init__(self, model: str = "base", compute_type: str = "int8") -> None:
-        self._model_name = model
+        self.model_name = model
         self._compute_type = compute_type
         self._model: Any | None = None
         self._lock = threading.Lock()
@@ -22,7 +22,7 @@ class SessionTranscriber:
         with self._lock:
             if self._model is None:
                 self._model = faster_whisper.WhisperModel(
-                    self._model_name,
+                    self.model_name,
                     device="cpu",
                     compute_type=self._compute_type,
                     cpu_threads=0,

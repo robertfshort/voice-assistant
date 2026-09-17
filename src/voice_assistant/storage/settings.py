@@ -33,6 +33,8 @@ class SpeechSettings(BaseModel):
     output_device: str = ""
     output_latency: str = "low"
     output_blocksize: int = 0
+    input_device: str = ""
+    transcription_model: str = "base"
 
 
 class AppearanceSettings(BaseModel):

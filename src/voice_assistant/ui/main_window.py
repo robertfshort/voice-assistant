@@ -1409,7 +1409,9 @@ class MainWindow(QMainWindow):
             if not session_id.startswith("table-"):
                 session_id = "table-" + session_id
         self._audio_session_id = session_id
-        self._audio_recorder = SessionAudioRecorder()
+        self._audio_recorder = SessionAudioRecorder(
+            input_device=self._speech_settings.input_device
+        )
         try:
             self._audio_recorder.start()
         except Exception as exc:
@@ -1422,8 +1424,13 @@ class MainWindow(QMainWindow):
 
     async def _transcribe_audio(self, audio_path: Path, session_id: str) -> None:
         try:
-            if self._audio_transcriber is None:
-                self._audio_transcriber = SessionTranscriber()
+            if (
+                self._audio_transcriber is None
+                or self._audio_transcriber.model_name != self._speech_settings.transcription_model
+            ):
+                self._audio_transcriber = SessionTranscriber(
+                    model=self._speech_settings.transcription_model
+                )
             text = await self._audio_transcriber.transcribe(audio_path)
         except Exception as exc:
             QMessageBox.critical(self, "Transcription error", str(exc))

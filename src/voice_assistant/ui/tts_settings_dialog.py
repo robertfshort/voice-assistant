@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from voice_assistant.services.audio_devices import output_devices
+from voice_assistant.services.audio_devices import input_devices, output_devices
 from voice_assistant.storage.settings import ProviderSettings, SpeechSettings
 from voice_assistant.storage.voices import import_piper_voice
 from voice_assistant.ui.installed_voices_dialog import InstalledVoicesDialog
@@ -34,7 +34,7 @@ class TtsSettingsDialog(QDialog):
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Text-to-speech settings")
+        self.setWindowTitle("Audio and TTS settings")
         layout = QVBoxLayout(self)
         form = QFormLayout()
         self.provider_input = QComboBox()
@@ -66,12 +66,31 @@ class TtsSettingsDialog(QDialog):
         self.blocksize_input.setRange(0, 65536)
         self.blocksize_input.setSpecialValueText("Automatic")
         self.blocksize_input.setValue(speech.output_blocksize)
+        self.input_device_input = QComboBox()
+        self.input_device_input.setEditable(True)
+        self.input_device_input.addItem("Default", "")
+        with suppress(Exception):
+            for device_id, label in input_devices():
+                self.input_device_input.addItem(label, device_id)
+        selected_input = self.input_device_input.findData(speech.input_device)
+        if selected_input >= 0:
+            self.input_device_input.setCurrentIndex(selected_input)
+        else:
+            self.input_device_input.setCurrentText(speech.input_device)
+        self.transcription_model_input = QComboBox()
+        self.transcription_model_input.setEditable(True)
+        self.transcription_model_input.addItems(
+            ("tiny", "base", "small", "medium", "large-v3-turbo")
+        )
+        self.transcription_model_input.setCurrentText(speech.transcription_model)
         form.addRow("Default provider", self.provider_input)
         form.addRow("Shared voices folder", root_row)
         form.addRow("Fallback order", self.fallback_input)
         form.addRow("Output device", self.output_device_input)
         form.addRow("Output latency", self.latency_input)
         form.addRow("Output block size", self.blocksize_input)
+        form.addRow("Input device", self.input_device_input)
+        form.addRow("Transcription model", self.transcription_model_input)
         layout.addLayout(form)
         voice_buttons = QHBoxLayout()
         import_button = QPushButton("Import Piper voice…")
@@ -154,13 +173,20 @@ class TtsSettingsDialog(QDialog):
         )
         current_data = self.output_device_input.currentData()
         current_text = self.output_device_input.currentText().strip()
-        device_value = current_data if current_data is not None else current_text
-        if isinstance(device_value, str) and device_value.lower() == "default":
-            device_value = ""
+        output_device = current_data if current_data is not None else current_text
+        if isinstance(output_device, str) and output_device.lower() == "default":
+            output_device = ""
+        input_data = self.input_device_input.currentData()
+        input_text = self.input_device_input.currentText().strip()
+        input_device = input_data if input_data is not None else input_text
+        if isinstance(input_device, str) and input_device.lower() == "default":
+            input_device = ""
         return self.provider_input.currentText(), SpeechSettings(
             voice_root=Path(root) if root else None,
             fallback_order=fallback,
-            output_device=str(device_value),
+            output_device=str(output_device),
             output_latency=self.latency_input.currentText(),
             output_blocksize=self.blocksize_input.value(),
+            input_device=str(input_device),
+            transcription_model=self.transcription_model_input.currentText().strip(),
         )

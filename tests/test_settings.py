@@ -58,6 +58,8 @@ def test_settings_round_trip(tmp_path: Path) -> None:
             output_device="Speakers",
             output_latency="high",
             output_blocksize=2048,
+            input_device="1",
+            transcription_model="small",
         ),
     )
 
