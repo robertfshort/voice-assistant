@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMenu,
     QMessageBox,
+    QProgressDialog,
     QPushButton,
     QSplitter,
     QTabWidget,
@@ -1423,6 +1424,18 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(f"Recording table audio: {session_id}")
 
     async def _transcribe_audio(self, audio_path: Path, session_id: str) -> None:
+        progress = QProgressDialog(
+            "Loading faster-whisper model and transcribing…",
+            "",
+            0,
+            0,
+            self,
+        )
+        progress.setWindowTitle("Transcribing")
+        progress.setWindowModality(Qt.WindowModality.WindowModal)
+        progress.setMinimumDuration(0)
+        progress.setRange(0, 0)
+        progress.show()
         try:
             if (
                 self._audio_transcriber is None
@@ -1454,6 +1467,7 @@ class MainWindow(QMainWindow):
                         )
             self.statusBar().showMessage(f"Transcribed table audio: {session_id}")
         finally:
+            progress.close()
             self._record_audio_button.setEnabled(True)
             self._record_audio_button.setText("Record table audio")
             self._audio_recorder = None
