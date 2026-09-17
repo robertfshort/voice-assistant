@@ -1,7 +1,7 @@
 import shutil
 from pathlib import Path
 
-from PySide6.QtWidgets import QDialog
+from PySide6.QtWidgets import QDialog, QMessageBox
 from pytest import MonkeyPatch
 from pytestqt.qtbot import QtBot
 
@@ -213,6 +213,27 @@ def test_lore_can_be_viewed_and_saved(
     assert "A newly established fact." in saved.read_text(encoding="utf-8")
     assert window._active_campaign is not None
     assert "A newly established fact." in window._active_campaign.lore["lanterns-rest.md"]
+
+
+def test_clear_conversation_removes_display_and_persisted_entries(
+    qtbot: QtBot, tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    campaign_root = tmp_path / "campaigns"
+    shutil.copytree(REPOSITORY_ROOT / "examples" / "campaigns", campaign_root)
+    campaign_directory = campaign_root / "sample"
+    append_transcript(campaign_directory, "elara-voss", "player", "Clear this")
+    window = MainWindow(campaign_root)
+    qtbot.addWidget(window)
+    monkeypatch.setattr(
+        QMessageBox,
+        "question",
+        lambda *args, **kwargs: QMessageBox.StandardButton.Yes,
+    )
+
+    window._clear_conversation()
+
+    assert window._transcript.toPlainText() == ""
+    assert not (campaign_directory / "sessions" / "elara-voss.jsonl").exists()
 
 
 def test_switching_npcs_updates_profile_and_isolates_transcripts(

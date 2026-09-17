@@ -43,6 +43,14 @@ def append_transcript(
     return entry
 
 
+def clear_transcript(campaign_directory: Path, npc_id: str) -> None:
+    path = transcript_path(campaign_directory, npc_id)
+    try:
+        path.unlink(missing_ok=True)
+    except OSError as exc:
+        raise CampaignError(f"Unable to clear transcript {path}: {exc}") from exc
+
+
 def load_transcript(campaign_directory: Path, npc_id: str) -> tuple[TranscriptEntry, ...]:
     path = transcript_path(campaign_directory, npc_id)
     if not path.exists():

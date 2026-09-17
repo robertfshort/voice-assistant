@@ -31,6 +31,7 @@ def main() -> None:
             str(REPOSITORY / "build"),
             "--collect-submodules=roomkit",
             "--collect-submodules=voice_assistant",
+            "--collect-all=piper",
             "--copy-metadata=roomkit",
             "--copy-metadata=voice-assistant",
             "--hidden-import=google.genai",

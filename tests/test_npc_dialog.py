@@ -33,6 +33,20 @@ def test_whole_npc_expansion_applies_name_before_dependent_fields(qtbot: QtBot) 
     assert dialog.public_knowledge_input.toPlainText() == "The guild raised its dues"
 
 
+def test_editor_uses_tabs_with_room_for_multiline_fields(qtbot: QtBot) -> None:
+    dialog = NpcDialog()
+    qtbot.addWidget(dialog)
+
+    assert [dialog.tabs.tabText(index) for index in range(dialog.tabs.count())] == [
+        "Identity",
+        "Knowledge",
+        "Details",
+        "Voice",
+    ]
+    assert dialog.role_input.minimumHeight() >= 100
+    assert dialog.public_knowledge_input.minimumHeight() >= 100
+
+
 def test_edit_dialog_prefills_fields_and_locks_stable_id(qtbot: QtBot) -> None:
     draft = NpcDraft(
         id="mara-vale",

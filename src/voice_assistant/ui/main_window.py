@@ -30,6 +30,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from voice_assistant.domain.errors import CampaignError
 from voice_assistant.domain.models import Campaign, Npc, SpeakerProfile
 from voice_assistant.services.conversation import explain_npc_lore
 from voice_assistant.services.session_notes import SessionNotes, propose_session_notes
@@ -48,7 +49,11 @@ from voice_assistant.storage.npc_lore_proposals import (
 )
 from voice_assistant.storage.settings import ProviderSettings, SpeechSettings
 from voice_assistant.storage.speakers import create_speaker, save_speaker
-from voice_assistant.storage.transcripts import append_transcript, load_transcript
+from voice_assistant.storage.transcripts import (
+    append_transcript,
+    clear_transcript,
+    load_transcript,
+)
 from voice_assistant.ui.npc_dialog import NpcDialog
 from voice_assistant.ui.spell_check_dialog import SpellCheckDialog
 from voice_assistant.ui.themes import THEME_NAMES, apply_theme
@@ -189,6 +194,9 @@ class MainWindow(QMainWindow):
         self._session_notes_button = QPushButton("Generate session notes")
         self._session_notes_button.setEnabled(False)
         self._session_notes_button.clicked.connect(self._on_generate_session_notes)
+        self._clear_conversation_button = QPushButton("Clear conversation")
+        self._clear_conversation_button.setEnabled(False)
+        self._clear_conversation_button.clicked.connect(self._clear_conversation)
         self._speak_as_npc_button = QPushButton("Speak as NPC")
         self._speak_as_npc_button.setEnabled(False)
         self._speak_as_npc_button.clicked.connect(self._on_speak_as_npc)
@@ -203,6 +211,7 @@ class MainWindow(QMainWindow):
         controls.addWidget(gm_button)
         controls.addWidget(self._inspect_button)
         controls.addWidget(self._session_notes_button)
+        controls.addWidget(self._clear_conversation_button)
         controls.addWidget(self._speak_as_npc_button)
         controls.addWidget(self._record_button)
         conversation_layout.addLayout(controls)
@@ -903,6 +912,7 @@ class MainWindow(QMainWindow):
             self._start_button.setEnabled(False)
             self._inspect_button.setEnabled(False)
             self._session_notes_button.setEnabled(False)
+            self._clear_conversation_button.setEnabled(False)
             self._speak_as_npc_button.setEnabled(False)
             return
         self._npc_heading.setText(self._active_npc.name)
@@ -919,6 +929,7 @@ class MainWindow(QMainWindow):
         self._start_button.setEnabled(True)
         self._inspect_button.setEnabled(True)
         self._session_notes_button.setEnabled(True)
+        self._clear_conversation_button.setEnabled(True)
         provider = self._active_npc.voice.preferred_provider
         self._speak_as_npc_button.setEnabled(provider in self._active_npc.voice.providers)
 
@@ -1145,6 +1156,30 @@ class MainWindow(QMainWindow):
             return
         for entry in load_transcript(self._active_campaign.directory, self._active_npc.id):
             self._append_transcript_display(entry.speaker, entry.text, private=entry.private)
+
+    def _clear_conversation(self) -> None:
+        if self._active_campaign is None or self._active_npc is None:
+            return
+        answer = QMessageBox.question(
+            self,
+            "Clear conversation",
+            f"Permanently clear the conversation with {self._active_npc.name}?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        if self._voice_session.active:
+            self._player_input.setEnabled(False)
+            self._gm_input.setEnabled(False)
+            asyncio.create_task(self._voice_session.stop())
+        try:
+            clear_transcript(self._active_campaign.directory, self._active_npc.id)
+        except CampaignError as exc:
+            QMessageBox.critical(self, "Conversation clear error", str(exc))
+            return
+        self._transcript.clear()
+        self.statusBar().showMessage(f"Cleared conversation with {self._active_npc.name}")
 
     def _append_transcript_display(
         self, speaker: str, text: str, *, private: bool = False

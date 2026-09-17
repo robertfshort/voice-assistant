@@ -13,13 +13,13 @@ from PySide6.QtWidgets import (
     QDoubleSpinBox,
     QFileDialog,
     QFormLayout,
-    QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QMessageBox,
     QPushButton,
     QSpinBox,
+    QTabWidget,
     QTextEdit,
     QVBoxLayout,
     QWidget,
@@ -66,37 +66,39 @@ class NpcDialog(QDialog):
         self._pending_generations: dict[str, asyncio.Task[None]] = {}
         self._pending_expansion: asyncio.Task[None] | None = None
         self.setWindowTitle("Create NPC")
-        self.resize(1100, 680)
+        self.resize(900, 680)
         layout = QVBoxLayout(self)
-        columns = QHBoxLayout()
-        profile_group = QGroupBox("Character")
-        profile_form = QFormLayout(profile_group)
-        details_group = QGroupBox("Details")
-        details_form = QFormLayout(details_group)
-        voice_group = QGroupBox("Voice")
-        voice_form = QFormLayout(voice_group)
+        self.tabs = QTabWidget()
+        identity_tab = QWidget()
+        identity_form = QFormLayout(identity_tab)
+        knowledge_tab = QWidget()
+        knowledge_form = QFormLayout(knowledge_tab)
+        details_tab = QWidget()
+        details_form = QFormLayout(details_tab)
+        voice_tab = QWidget()
+        voice_form = QFormLayout(voice_tab)
 
         self.name_input = QLineEdit()
         self.name_input.textChanged.connect(self._suggest_id)
         self.id_input = QLineEdit()
         self.id_input.setPlaceholderText("lowercase-id-with-hyphens")
         self.role_input = QTextEdit()
-        self.role_input.setMaximumHeight(90)
+        self.role_input.setMinimumHeight(110)
         self.personality_input = QTextEdit()
-        self.personality_input.setMaximumHeight(80)
+        self.personality_input.setMinimumHeight(110)
         self.background_input = QTextEdit()
-        self.background_input.setMaximumHeight(80)
+        self.background_input.setMinimumHeight(110)
         self.goals_input = QTextEdit()
-        self.goals_input.setMaximumHeight(80)
+        self.goals_input.setMinimumHeight(100)
         self.public_knowledge_input = QTextEdit()
-        self.public_knowledge_input.setMaximumHeight(80)
+        self.public_knowledge_input.setMinimumHeight(100)
         self.affiliations_input = QTextEdit()
-        self.affiliations_input.setMaximumHeight(80)
+        self.affiliations_input.setMinimumHeight(100)
         self.affiliations_input.setToolTip(
             "One per line, or comma-separated. Used for restricted lore."
         )
         self.relationships_input = QTextEdit()
-        self.relationships_input.setMaximumHeight(80)
+        self.relationships_input.setMinimumHeight(100)
         self.relationships_input.setToolTip("One per line, or comma-separated.")
         self.home_input = QLineEdit()
         self.home_input.setPlaceholderText("Where the NPC is from")
@@ -153,27 +155,27 @@ class NpcDialog(QDialog):
         self.piper_channels_input.setRange(0, 2)
         self.piper_channels_input.setSpecialValueText("Automatic")
 
-        profile_form.addRow("Name", self._field_with_ai(self.name_input, "name"))
-        profile_form.addRow("Stable ID", self.id_input)
-        profile_form.addRow("Role", self._field_with_ai(self.role_input, "role", flesh_out=True))
-        profile_form.addRow(
+        identity_form.addRow("Name", self._field_with_ai(self.name_input, "name"))
+        identity_form.addRow("Stable ID", self.id_input)
+        identity_form.addRow("Role", self._field_with_ai(self.role_input, "role", flesh_out=True))
+        identity_form.addRow(
             "Personality",
             self._field_with_ai(self.personality_input, "personality", flesh_out=True),
         )
-        profile_form.addRow(
+        identity_form.addRow(
             "Background",
             self._field_with_ai(self.background_input, "background", flesh_out=True),
         )
-        profile_form.addRow(
+        knowledge_form.addRow(
             "Goals", self._field_with_ai(self.goals_input, "goals", flesh_out=True)
         )
-        profile_form.addRow(
+        knowledge_form.addRow(
             "Public knowledge",
             self._field_with_ai(self.public_knowledge_input, "public_knowledge", flesh_out=True),
         )
+        knowledge_form.addRow("Affiliations", self.affiliations_input)
+        knowledge_form.addRow("Relationships", self.relationships_input)
 
-        details_form.addRow("Affiliations", self.affiliations_input)
-        details_form.addRow("Relationships", self.relationships_input)
         details_form.addRow("Home region", self.home_input)
         details_form.addRow("Current location", self.location_input)
         voice_form.addRow("Mood", self._field_with_ai(self.mood_input, "mood"))
@@ -215,10 +217,11 @@ class NpcDialog(QDialog):
         self.archived_input = QCheckBox("Archived (hide from active NPC list)")
         details_form.addRow(self.archived_input)
 
-        columns.addWidget(profile_group, 4)
-        columns.addWidget(details_group, 2)
-        columns.addWidget(voice_group, 3)
-        layout.addLayout(columns, 1)
+        self.tabs.addTab(identity_tab, "Identity")
+        self.tabs.addTab(knowledge_tab, "Knowledge")
+        self.tabs.addTab(details_tab, "Details")
+        self.tabs.addTab(voice_tab, "Voice")
+        layout.addWidget(self.tabs, 1)
 
         action_row = QHBoxLayout()
         self.ai_expand_button = QPushButton("Generate this NPC with AI")
