@@ -33,6 +33,22 @@ def test_whole_npc_expansion_applies_name_before_dependent_fields(qtbot: QtBot) 
     assert dialog.public_knowledge_input.toPlainText() == "The guild raised its dues"
 
 
+def test_piper_voice_is_editable_dropdown_of_registered_voices(
+    qtbot: QtBot, tmp_path: Path
+) -> None:
+    (tmp_path / "voices.yaml").write_text(
+        "piper:\n  innkeeper:\n    model: piper/innkeeper.onnx\n"
+        "  sage:\n    model: piper/sage.onnx\n",
+        encoding="utf-8",
+    )
+    dialog = NpcDialog(voice_root=tmp_path)
+    qtbot.addWidget(dialog)
+    items = [dialog.piper_voice_input.itemText(i) for i in range(dialog.piper_voice_input.count())]
+    assert "" in items
+    assert "innkeeper" in items
+    assert "sage" in items
+
+
 def test_editor_uses_tabs_with_room_for_multiline_fields(qtbot: QtBot) -> None:
     dialog = NpcDialog()
     qtbot.addWidget(dialog)

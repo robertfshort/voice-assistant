@@ -36,6 +36,7 @@ from voice_assistant.services.conversation import explain_npc_lore
 from voice_assistant.services.session_notes import SessionNotes, propose_session_notes
 from voice_assistant.services.spell_check import CampaignSpellCheck
 from voice_assistant.services.text_to_speech import speak_text
+from voice_assistant.services.voice_preview import tts_segments
 from voice_assistant.services.voice_session import VoiceSessionController
 from voice_assistant.storage.campaigns import create_campaign, discover_campaigns, load_campaign
 from voice_assistant.storage.credentials import CredentialStore
@@ -1415,6 +1416,9 @@ class MainWindow(QMainWindow):
             )
         except Exception as exc:
             QMessageBox.critical(self, "TTS error", str(exc))
+        else:
+            spoken = " ".join(part for _, part in tts_segments(text) if part)
+            self._save_transcript("npc", spoken)
         finally:
             self._speak_as_npc_button.setEnabled(True)
             self._speak_as_npc_button.setText("Speak as NPC")

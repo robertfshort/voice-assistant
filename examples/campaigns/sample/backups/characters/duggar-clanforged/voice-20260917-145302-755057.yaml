@@ -1,0 +1,4 @@
+style: authoritative, terse
+providers:
+  gemini:
+    voice: Charon

@@ -1,13 +1,13 @@
-style: authoritative, terse. Speaks with a heavy scottish accent
+style: authoritative, terse
 providers:
   gemini:
     voice: Charon
   piper:
     voice: ''
     model: D:/repo/Conversational AI/Early Alpha/RPG Voice Assistant Early Alpha/Piper
-      Voices/piper/en-us-joe-medium/en_US-joe-medium.onnx
+      Voices/piper/en-us-hfc-male-medium/en_US-hfc_male-medium.onnx
     config: D:/repo/Conversational AI/Early Alpha/RPG Voice Assistant Early Alpha/Piper
-      Voices/piper/en-us-joe-medium/en_US-joe-medium.onnx.json
+      Voices/piper/en-us-hfc-male-medium/en_US-hfc_male-medium.onnx.json
     speaker_id: null
     length_scale: 1.0
     noise_scale: 0.67

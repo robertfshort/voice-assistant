@@ -17,7 +17,7 @@ def output_devices() -> tuple[tuple[str, str], ...]:
 
 
 def output_device_value(value: str) -> int | str | None:
-    if not value:
+    if not value or value.lower() == "default":
         return None
     return int(value) if value.isdigit() else value
 

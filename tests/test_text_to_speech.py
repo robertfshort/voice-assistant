@@ -17,6 +17,8 @@ def test_output_device_value_supports_stable_device_indexes() -> None:
     assert output_device_value("") is None
     assert output_device_value("3") == 3
     assert output_device_value("Speakers") == "Speakers"
+    assert output_device_value("default") is None
+    assert output_device_value("Default") is None
 
 
 def test_convert_pcm16_channels_duplicates_mono_to_stereo() -> None:

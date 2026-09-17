@@ -39,6 +39,7 @@ from voice_assistant.services.npc_generation import (
 from voice_assistant.services.text_to_speech import speak_text
 from voice_assistant.storage.credentials import CredentialStore
 from voice_assistant.storage.npc_creation import NpcDraft
+from voice_assistant.storage.voices import load_voice_registry
 
 
 class NpcDialog(QDialog):
@@ -119,8 +120,10 @@ class NpcDialog(QDialog):
         self.voice_gender_input = QComboBox()
         self.voice_gender_input.addItems(GEMINI_GENDERS)
         self.voice_input = QComboBox()
-        self.piper_voice_input = QLineEdit()
+        self.piper_voice_input = QComboBox()
+        self.piper_voice_input.setEditable(True)
         self.piper_voice_input.setPlaceholderText("Name from voices.yaml")
+        self._refresh_piper_voices()
         self.piper_model_input = QLineEdit()
         self.piper_model_button = QPushButton("Browse…")
         self.piper_model_button.clicked.connect(self._browse_piper_model)
@@ -264,7 +267,7 @@ class NpcDialog(QDialog):
         self.style_input.setCurrentText(draft.speaking_style)
         self.voice_provider_input.setCurrentText(draft.preferred_voice_provider)
         self._set_voice(draft.gemini_voice)
-        self.piper_voice_input.setText(draft.piper_voice)
+        self.piper_voice_input.setCurrentText(draft.piper_voice)
         self.piper_model_input.setText(draft.piper_model)
         self.piper_config_input.setText(draft.piper_config)
         self.piper_speaker_input.setValue(
@@ -280,6 +283,20 @@ class NpcDialog(QDialog):
             self.portrait_input.setText(draft.portrait)
             self._load_portrait_preview(draft.portrait)
         self.archived_input.setChecked(draft.archived)
+
+    def _refresh_piper_voices(self) -> None:
+        registry = load_voice_registry(self._voice_root)
+        names = sorted(registry.piper.keys())
+        current = self.piper_voice_input.currentText()
+        self.piper_voice_input.blockSignals(True)
+        self.piper_voice_input.clear()
+        self.piper_voice_input.addItem("")
+        self.piper_voice_input.addItems(names)
+        if self.piper_voice_input.findText(current) >= 0:
+            self.piper_voice_input.setCurrentText(current)
+        else:
+            self.piper_voice_input.setEditText(current)
+        self.piper_voice_input.blockSignals(False)
 
     def _path_field(self, field: QLineEdit, button: QPushButton) -> QWidget:
         container = QWidget()
@@ -418,7 +435,7 @@ class NpcDialog(QDialog):
         name = self.name_input.text().strip() or "this character"
         try:
             piper = VoiceProviderConfig(
-                voice=self.piper_voice_input.text().strip(),
+                voice=self.piper_voice_input.currentText().strip(),
                 model=self.piper_model_input.text().strip(),
                 config=self.piper_config_input.text().strip(),
                 speaker_id=(
@@ -603,7 +620,7 @@ class NpcDialog(QDialog):
             speaking_style=self.style_input.currentText().strip(),
             preferred_voice_provider=self.voice_provider_input.currentText(),
             gemini_voice=self.voice_input.currentText(),
-            piper_voice=self.piper_voice_input.text().strip(),
+            piper_voice=self.piper_voice_input.currentText().strip(),
             piper_model=self.piper_model_input.text().strip(),
             piper_config=self.piper_config_input.text().strip(),
             piper_speaker_id=(

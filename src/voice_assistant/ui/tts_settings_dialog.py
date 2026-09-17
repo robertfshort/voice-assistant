@@ -152,13 +152,15 @@ class TtsSettingsDialog(QDialog):
         fallback = tuple(
             item.strip().lower() for item in self.fallback_input.text().split(",") if item.strip()
         )
+        current_data = self.output_device_input.currentData()
+        current_text = self.output_device_input.currentText().strip()
+        device_value = current_data if current_data is not None else current_text
+        if isinstance(device_value, str) and device_value.lower() == "default":
+            device_value = ""
         return self.provider_input.currentText(), SpeechSettings(
             voice_root=Path(root) if root else None,
             fallback_order=fallback,
-            output_device=str(
-                self.output_device_input.currentData()
-                or self.output_device_input.currentText().strip()
-            ),
+            output_device=str(device_value),
             output_latency=self.latency_input.currentText(),
             output_blocksize=self.blocksize_input.value(),
         )
