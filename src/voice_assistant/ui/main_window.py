@@ -33,7 +33,9 @@ from PySide6.QtWidgets import (
 from voice_assistant.domain.errors import CampaignError
 from voice_assistant.domain.models import Campaign, Npc, SpeakerProfile
 from voice_assistant.services.conversation import explain_npc_lore
+from voice_assistant.services.session_audio import SessionAudioRecorder
 from voice_assistant.services.session_notes import SessionNotes, propose_session_notes
+from voice_assistant.services.session_transcription import SessionTranscriber
 from voice_assistant.services.spell_check import CampaignSpellCheck
 from voice_assistant.services.text_to_speech import speak_text
 from voice_assistant.services.voice_preview import tts_segments
@@ -56,6 +58,7 @@ from voice_assistant.storage.transcripts import (
     load_transcript,
 )
 from voice_assistant.ui.npc_dialog import NpcDialog
+from voice_assistant.ui.session_transcription_dialog import SessionTranscriptionReviewDialog
 from voice_assistant.ui.spell_check_dialog import SpellCheckDialog
 from voice_assistant.ui.themes import THEME_NAMES, apply_theme
 from voice_assistant.ui.tts_settings_dialog import TtsSettingsDialog
@@ -84,6 +87,9 @@ class MainWindow(QMainWindow):
         self._active_speaker: SpeakerProfile | None = None
         self._active_lore_id: str | None = None
         self._recording_session_id: str | None = None
+        self._audio_recorder: SessionAudioRecorder | None = None
+        self._audio_session_id: str | None = None
+        self._audio_transcriber: SessionTranscriber | None = None
         self._credentials = CredentialStore()
         self._voice_session = VoiceSessionController()
         self._voice_session.state_changed.connect(self._voice_state_changed)
@@ -352,6 +358,10 @@ class MainWindow(QMainWindow):
         self._stop_session_button.setEnabled(False)
         self._stop_session_button.clicked.connect(self._toggle_session_recording)
         session_controls.addWidget(self._stop_session_button)
+        self._record_audio_button = QPushButton("Record table audio")
+        self._record_audio_button.setEnabled(False)
+        self._record_audio_button.clicked.connect(self._toggle_audio_recording)
+        session_controls.addWidget(self._record_audio_button)
         session_controls.addStretch()
         session_layout.addLayout(session_controls)
         tabs.addTab(session, "Session")
@@ -490,6 +500,7 @@ class MainWindow(QMainWindow):
         self._new_lore_button.setEnabled(self._active_campaign is not None)
         self._new_speaker_button.setEnabled(self._active_campaign is not None)
         self._record_button.setEnabled(self._active_campaign is not None)
+        self._record_audio_button.setEnabled(self._active_campaign is not None)
         self._stop_session_button.setEnabled(False)
         if self._recording_session_id is not None:
             self._recording_session_id = None
@@ -1355,6 +1366,100 @@ class MainWindow(QMainWindow):
             )
         )
         self.statusBar().showMessage(f"Recording session: {self._recording_session_id}")
+
+    def _toggle_audio_recording(self) -> None:
+        if self._active_campaign is None:
+            return
+        if self._audio_recorder is not None and self._audio_recorder.is_recording:
+            if self._audio_session_id is None or self._active_campaign is None:
+                return
+            self._record_audio_button.setEnabled(False)
+            self._record_audio_button.setText("Stopping…")
+            audio_path = (
+                self._active_campaign.directory / "sessions" / self._audio_session_id / "audio.wav"
+            )
+            try:
+                self._audio_recorder.stop(audio_path)
+            except Exception as exc:
+                QMessageBox.critical(self, "Audio recording error", str(exc))
+                self._record_audio_button.setEnabled(True)
+                self._record_audio_button.setText("Record table audio")
+                return
+            self._record_audio_button.setText("Transcribing…")
+            self.statusBar().showMessage("Transcribing table audio…")
+            asyncio.create_task(self._transcribe_audio(audio_path, self._audio_session_id))
+            return
+        session_id = self._recording_session_id
+        if session_id is None:
+            row = self._session_list.currentRow()
+            if row >= 0:
+                session_id = self._session_list.item(row).text()
+        if session_id is None:
+            session_id, accepted = QInputDialog.getText(
+                self,
+                "Record table audio",
+                "Session ID to record audio into:",
+                text=f"table-{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}",
+            )
+            if not accepted or not session_id.strip():
+                return
+            session_id = session_id.strip().replace("\\", "/").replace(" ", "-")
+            if session_id.endswith(".jsonl"):
+                session_id = session_id[: -len(".jsonl")]
+            if not session_id.startswith("table-"):
+                session_id = "table-" + session_id
+        self._audio_session_id = session_id
+        self._audio_recorder = SessionAudioRecorder()
+        try:
+            self._audio_recorder.start()
+        except Exception as exc:
+            QMessageBox.critical(self, "Audio recording error", str(exc))
+            self._audio_recorder = None
+            self._audio_session_id = None
+            return
+        self._record_audio_button.setText("Stop table audio")
+        self.statusBar().showMessage(f"Recording table audio: {session_id}")
+
+    async def _transcribe_audio(self, audio_path: Path, session_id: str) -> None:
+        try:
+            if self._audio_transcriber is None:
+                self._audio_transcriber = SessionTranscriber()
+            text = await self._audio_transcriber.transcribe(audio_path)
+        except Exception as exc:
+            QMessageBox.critical(self, "Transcription error", str(exc))
+        else:
+            if self._active_campaign is not None and text.strip():
+                speakers = ["gm", "table", "npc"]
+                seen = set(speakers)
+                for profile in self._active_campaign.speakers:
+                    if profile.name not in seen:
+                        speakers.append(profile.name)
+                        seen.add(profile.name)
+                dialog = SessionTranscriptionReviewDialog(text, speakers, self)
+                if dialog.exec() == QDialog.DialogCode.Accepted:
+                    reviewed_text = dialog.transcript()
+                    if reviewed_text and (speaker_name := dialog.speaker()):
+                        append_transcript(
+                            self._active_campaign.directory,
+                            session_id,
+                            speaker_name,
+                            reviewed_text,
+                        )
+            self.statusBar().showMessage(f"Transcribed table audio: {session_id}")
+        finally:
+            self._record_audio_button.setEnabled(True)
+            self._record_audio_button.setText("Record table audio")
+            self._audio_recorder = None
+            self._audio_session_id = None
+            self._load_session_list()
+            if self._session_list.findItems(session_id, Qt.MatchFlag.MatchExactly):
+                self._session_list.setCurrentRow(
+                    next(
+                        i
+                        for i in range(self._session_list.count())
+                        if self._session_list.item(i).text() == session_id
+                    )
+                )
 
     def _send_player_text(self) -> None:
         text = self._player_input.text().strip()

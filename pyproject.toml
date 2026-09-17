@@ -21,6 +21,7 @@ dependencies = [
     "piper-tts>=1.3,<2",
     "numpy>=2,<3",
     "httpx>=0.27,<1",
+    "faster-whisper>=1.1,<2",
 ]
 
 [dependency-groups]
@@ -55,7 +56,22 @@ python_version = "3.12"
 strict = true
 
 [[tool.mypy.overrides]]
-module = ["PyInstaller.*", "PySide6.*", "qasync", "yaml", "spellchecker"]
+module = [
+    "PyInstaller.*",
+    "PySide6.*",
+    "qasync",
+    "yaml",
+    "spellchecker",
+    "faster_whisper.*",
+    "ctranslate2.*",
+    "tokenizers.*",
+    "av.*",
+    "huggingface_hub.*",
+    "tqdm.*",
+    "filelock.*",
+    "fsspec.*",
+    "huggingface_hub.*",
+]
 ignore_missing_imports = true
 
 [tool.bandit]
