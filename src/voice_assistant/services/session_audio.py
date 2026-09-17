@@ -37,7 +37,8 @@ class SessionAudioRecorder:
         self._stream.start()
 
     def _callback(self, indata: Any, *args: Any) -> None:
-        self._frames.put(indata.tobytes())
+        data: bytes = indata.tobytes() if hasattr(indata, "tobytes") else bytes(indata)
+        self._frames.put(data)
 
     def stop(self, output_path: Path) -> None:
         if self._stream is None:
